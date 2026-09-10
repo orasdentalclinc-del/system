@@ -2799,6 +2799,42 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       return text ? u + "&text=" + encodeURIComponent(text) : u;
     }
 
+    // كشف بيئة Electron (تطبيق سطح المكتب)
+    function isElectronEnv(){
+      try{
+        if(typeof navigator !== "undefined" && /electron/i.test(navigator.userAgent||"")) return true;
+        if(typeof window !== "undefined" && (window.electronAPI || window.require)) return true;
+        if(typeof process !== "undefined" && process.versions && process.versions.electron) return true;
+      }catch(e){}
+      return false;
+    }
+
+    // فتح رابط خارجي: في Electron عبر shell.openExternal (لأن window.open محجوب)،
+    // وإلا عبر window.open — يرجع true عند نجاح الفتح
+    function openExternalLink(url){
+      if(!url) return false;
+      try{
+        if(typeof window !== "undefined" && window.electronAPI && typeof window.electronAPI.openExternal === "function"){
+          window.electronAPI.openExternal(url);
+          return true;
+        }
+      }catch(e){ console.warn("electronAPI.openExternal failed", e); }
+      try{
+        if(typeof window !== "undefined" && typeof window.require === "function"){
+          const el = window.require("electron");
+          if(el && el.shell && typeof el.shell.openExternal === "function"){
+            el.shell.openExternal(url);
+            return true;
+          }
+        }
+      }catch(e){ console.warn("shell.openExternal failed", e); }
+      try{
+        const w = window.open(url, "_blank", "noopener");
+        if(w){ try{ w.opener = null; }catch(e2){} return true; }
+      }catch(e){ console.warn("window.open failed", e); }
+      return false;
+    }
+
     function planProgressRows(plan){
       return PLAN_TYPES.map((t,i)=>({t,i,c:(plan&&plan.cols&&plan.cols[i])||{}})).filter(r=>{
         return String(r.c.count||"").trim() || String(r.c.done||"").trim() || String(r.c.position||"").trim() || String(r.c.notes||"").trim();
@@ -2908,9 +2944,9 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const chatUrl = waWebUrl(p.phone, planPdfCaption(p));
       let chatOpened = false;
       if(chatUrl){
-        try{ window.open(chatUrl, "_blank", "noopener"); chatOpened = true; }catch(e){ console.warn("wa web open failed", e); }
+        chatOpened = openExternalLink(chatUrl);
       }
-      message(chatOpened ? "تم فتح محادثة واتساب ويب — جارٍ تجهيز ملف PDF، أرفقه في المحادثة بعد نزوله." : "لا يوجد رقم جوال مسجل — جارٍ تجهيز ملف PDF فقط.");
+      message(chatOpened ? "تم فتح محادثة واتساب ويب — جارٍ تجهيز ملف PDF، أرفقه في المحادثة بعد نزوله." : (!chatUrl ? "لا يوجد رقم جوال مسجل — جارٍ تجهيز ملف PDF فقط." : "تعذر فتح واتساب تلقائياً — جارٍ تجهيز ملف PDF، وانسخ رابط المحادثة من زر «رسائل المتابعة»."));
       let sheet = document.getElementById("planPdfSheet");
       if(!sheet){
         sheet = document.createElement("div");
@@ -2985,18 +3021,23 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           ${waLink ? `<button type="button" class="primary" id="waOpenBtn" style="background:#128c4b;border-color:#128c4b">📲 فتح واتساب ويب (دردشة المريض)</button>` : `<span class="sub">لا يوجد رقم جوال مسجل لهذا المريض — أضفه في الملف أولاً.</span>`}
         </div>`;
       if(submitBtn) submitBtn.style.display = "none";
+      const onSubmit = (e) => e.preventDefault();
       const restore = () => {
         modal.classList.add("hidden");
         if(submitBtn) submitBtn.style.display = "";
+        if(form) form.removeEventListener("submit", onSubmit);
         cancelBtn.removeEventListener("click", onCancel);
         if(closeBtn) closeBtn.removeEventListener("click", onCancel);
         document.removeEventListener("keydown", onKey);
       };
       const onKey = (e) => { if(e.key==="Escape"||e.key==="Esc"){ e.preventDefault(); restore(); } };
       const onCancel = () => restore();
+      if(form) form.addEventListener("submit", onSubmit);
       cancelBtn.addEventListener("click", onCancel);
       if(closeBtn) closeBtn.addEventListener("click", onCancel);
       document.addEventListener("keydown", onKey);
+      modal.classList.remove("hidden");
+      setTimeout(()=>{ const b = document.getElementById("waOpenBtn") || document.getElementById("waCopyBtn"); if(b) b.focus(); }, 50);
       const copyBtn = document.getElementById("waCopyBtn");
       if(copyBtn) copyBtn.addEventListener("click", ()=>{
         const done = ()=>message("تم نسخ الرسالة إلى الحافظة.");
@@ -3005,7 +3046,30 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         } else fallbackCopy(msg, done);
       });
       const openBtn = document.getElementById("waOpenBtn");
-      if(openBtn) openBtn.addEventListener("click", ()=>{ window.open(waLink,"_blank","noopener"); });
+      if(openBtn) openBtn.addEventListener("click", ()=>{
+        if(openExternalLink(waLink)) return;
+        // تعذر الفتح التلقائي (حجب window.open في Electron أو مانع النوافذ) — اعرض صندوق رابط قابل للنسخ
+        let box = document.getElementById("waLinkBox");
+        if(box){ const inp = box.querySelector("input"); if(inp){ inp.focus(); inp.select(); } return; }
+        box = document.createElement("div");
+        box.id = "waLinkBox";
+        box.style.cssText = "margin-top:12px;padding:12px;border:1px dashed var(--gold,#c9a227);border-radius:10px;background:#fffdf7";
+        box.innerHTML = `
+          <p style="margin:0 0 8px;font-size:13px">تعذّر فتح واتساب تلقائياً — انسخ الرابط والصقه في المتصفح:</p>
+          <div style="display:flex;gap:8px">
+            <input type="text" readonly dir="ltr" value="${esc(waLink)}" style="flex:1;min-width:0">
+            <button type="button" class="secondary" id="waLinkCopyBtn">📋 نسخ الرابط</button>
+          </div>`;
+        openBtn.closest(".button-row").insertAdjacentElement("afterend", box);
+        const inp = box.querySelector("input");
+        inp.focus(); inp.select();
+        box.querySelector("#waLinkCopyBtn").addEventListener("click", ()=>{
+          const done = ()=>message("تم نسخ رابط المحادثة.");
+          if(navigator.clipboard && navigator.clipboard.writeText){
+            navigator.clipboard.writeText(waLink).then(done).catch(()=>fallbackCopy(waLink, done));
+          } else fallbackCopy(waLink, done);
+        });
+      });
     }
     function fallbackCopy(text, done){
       try{
