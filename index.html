@@ -24,6 +24,9 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics-compat.js"></script>
+  <!-- مكتبات توليد PDF (خطة العلاج) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script>
     // Firebase Configuration
     const firebaseConfig = {
@@ -357,6 +360,69 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     .locked-value{display:inline-block;padding:2px 8px;border-radius:6px;background:#ece6da;color:var(--muted);font-size:11px;font-weight:700}
     .dyn-list{display:grid;gap:8px;margin-bottom:10px}
     .dyn-input,.dyn-key,.dyn-val{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:#fff;color:var(--ink);height:40px}
+    /* استمارة الخطة العلاجية (نموذج ورقي بلا رسوم الأسنان) */
+    .plan-sheet{padding:26px}
+    .plan-top{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:14px;margin-bottom:15px}
+    .plan-top h2{margin:0;font-size:19px;color:var(--gold-dark)}
+    .plan-date{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800}
+    .plan-date input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);height:40px;min-width:155px}
+    .plan-checks{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;font-size:13px;font-weight:700}
+    .plan-checks label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:#fff;cursor:pointer;color:#4c4943}
+    .plan-checks input{width:17px;height:17px;accent-color:var(--gold-dark)}
+    .plan-table-wrap{overflow-x:auto}
+    .plan-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:820px}
+    .plan-table th,.plan-table td{border:1px solid #b7ad9c;padding:8px;vertical-align:top;background:#fff}
+    .plan-table thead th{background:#f6f1e5;color:#7f5d1a;text-align:center;vertical-align:middle;padding:10px 5px}
+    .plan-num{display:inline-grid;place-items:center;min-width:22px;height:22px;border:2px solid #7f5d1a;border-radius:50%;font-size:12px;font-weight:800;margin-bottom:6px}
+    .plan-type{display:block;font-size:12px;font-weight:800;line-height:1.5}
+    .plan-advice-col{background:#fbf8f0}
+    .plan-advice-col textarea{width:100%;min-height:175px;border:1px dashed #cbbf9f;border-radius:8px;padding:9px;background:#fff;color:var(--ink);resize:vertical;line-height:1.8;font-size:13px;box-sizing:border-box}
+    .plan-advice-col textarea:focus{outline:none;border-color:var(--gold);background:#fffdf7}
+    .plan-rowhead{background:#f6f1e5;font-weight:800;color:#7f5d1a;text-align:center;vertical-align:middle;font-size:13px;line-height:1.6}
+    .plan-table td input,.plan-table td textarea{width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:7px;padding:7px 8px;background:transparent;color:var(--ink);font-size:13px}
+    .plan-table td input:focus,.plan-table td textarea:focus{outline:none;border-color:var(--gold);background:#fffdf7}
+    .plan-table td textarea{min-height:64px;resize:vertical;line-height:1.7}
+    .plan-table td input[type=number]{text-align:center;font-weight:700;-moz-appearance:textfield}
+    .plan-table td input[type=number]::-webkit-inner-spin-button,.plan-table td input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+    .plan-signs{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:18px;border-top:2px solid var(--line);padding-top:16px}
+    .plan-sign{display:flex;align-items:flex-end;gap:10px;min-width:240px;flex:1;max-width:340px}
+    .plan-sign label{font-size:13px;font-weight:800;color:var(--muted);white-space:nowrap}
+    .plan-sign input{flex:1;height:38px;border:none;border-bottom:2px solid var(--line);border-radius:0;background:transparent;padding:6px 10px;font-size:14px;color:var(--ink)}
+    .plan-sign input:focus{outline:none;border-bottom-color:var(--gold)}
+    .plan-history-chip{font-size:12px;padding:7px 12px;text-align:right}
+    .prog-done-input{width:74px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:center;font-weight:700;background:#fff;color:var(--ink)}
+    .prog-done-input:focus{outline:none;border-color:var(--gold);background:#fffdf7}
+    .prog-wrap{width:100%;min-width:90px;height:9px;border-radius:99px;background:#ece6da;overflow:hidden}
+    .prog-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--gold-dark));transition:width .3s}
+    .prog-bar.full{background:var(--green)}
+    /* صفحة متابعة المرضى */
+    .fu-alert{border-color:#dec885;box-shadow:0 8px 30px -14px rgba(127,93,26,.25)}
+    .fu-alert .panel-head{background:linear-gradient(135deg,#fff9e9,#fdf4dc)}
+    .fu-card{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid #f0ece5;flex-wrap:wrap}
+    .fu-card:last-child{border-bottom:0}
+    .fu-card:hover{background:#fcfaf4}
+    .fu-card .initial{width:46px;height:46px;font-size:17px}
+    .fu-card .row-meta{min-width:110px}
+    .fu-card .button-row{flex-basis:100%;justify-content:flex-start;padding-top:4px;margin-top:2px}
+    /* فقاعة رسالة واتساب */
+    .wa-bubble{direction:rtl;background:#e7f6e9;border:1px solid #bfe3c6;border-radius:14px 14px 14px 4px;padding:14px 16px;font-size:14px;line-height:2;color:#1d3a24;white-space:normal}
+    .wa-bubble div{min-height:1em}
+    /* ورقة الخطة المستخدمة لتوليد ملف PDF */
+    #planPdfSheet{position:fixed;left:-10000px;top:0;width:1100px;z-index:-1;background:#fff;color:#1d1d1b}
+    .pdf-sheet{width:1100px;padding:26px 30px;box-sizing:border-box;font-family:inherit;color:#1d1d1b;background:#fff}
+    .pdf-head{display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:3px solid #b5842a;padding-bottom:12px;margin-bottom:16px}
+    .pdf-brand{display:flex;align-items:center;gap:10px}
+    .pdf-brand .mark{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#d8b258,#a97f2b);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:800}
+    .pdf-brand strong{display:block;font-size:18px;color:#7f5d1a}
+    .pdf-brand small{color:#8a8172;letter-spacing:1px;font-size:10px}
+    .pdf-title{font-size:22px;font-weight:800;color:#7f5d1a}
+    .pdf-meta{display:grid;gap:4px;font-size:13px;text-align:left;color:#4c4943}
+    .pdf-table{min-width:0}
+    .pdf-table .pdf-val{font-size:13px;line-height:1.6}
+    .pdf-table .pdf-val-notes{min-height:64px}
+    .pdf-table .pdf-advice-cell{font-size:13px;line-height:1.9;min-height:150px}
+    .pdf-progress{margin-top:14px;font-size:14px;color:#7f5d1a;background:#f6f1e5;border:1px solid #e3d5ae;border-radius:10px;padding:10px 14px}
+    .pdf-signs .plan-sign span{flex:1;border-bottom:2px solid #b7ad9c;min-height:32px;font-weight:700;padding:4px 10px;color:#1d1d1b}
     #dashSearchResults{display:none;margin-top:15px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;max-height:350px;overflow-y:auto;color:var(--ink);text-align:right}
     #dashSearchResults.active{display:block}
     .dash-search-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);transition:background 0.2s}
@@ -462,6 +528,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     <nav class="nav">
       <button data-view="visits"><span class="nav-icon">◷</span>سجل الزيارات</button>
       <button data-view="patients"><span class="nav-icon">♙</span>دليل المرضى</button>
+      <button data-view="follow-up"><span class="nav-icon">📲</span>متابعة المرضى</button>
       <button data-view="reports"><span class="nav-icon">▥</span>التقرير الشامل والأداء</button>
       <button data-action="backup"><span class="nav-icon">⇩</span>حفظ نسخة احتياطية (JSON)</button>
       <button data-action="restore"><span class="nav-icon">⇧</span>استعادة نسخة (JSON)</button>
@@ -594,7 +661,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
   <script>
 
     "use strict";
-    const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", NARRATIVES_KEY="oras-dental-report-narratives-v1", today=new Date().toISOString().slice(0,10);
+    const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", NARRATIVES_KEY="oras-dental-report-narratives-v1", PLANS_KEY="oras-dental-treatment-plans-v1", today=new Date().toISOString().slice(0,10);
     const ARABIC_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
     const THEME_KEY="oras-dental-theme-v1";
     const MORNING_PASS_KEY="oras-dental-morning-pass-v1", EVENING_PASS_KEY="oras-dental-evening-pass-v1", MANAGER_PASS_KEY="oras-dental-manager-pass-v1";
@@ -699,6 +766,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     const TIME_LIST = ["صباح", "مساء", "نهاية الأسبوع"];
     const REASON_LIST = ["السعر", "السمعة", "القرب", "سرعة الخدمة", "الطبيب", "التصميم / النظافة"];
     const SERVICE_LIST = ["علاجي (ألم)", "تجميلي", "وقائي", "طارئ"];
+    // أنواع العلاج في استمارة الخطة العلاجية (بنفس ترتيب النموذج الورقي)
+    const PLAN_TYPES = ["المالح", "تعبئة وتعويض حديدية", "حشوات", "علاج جذور", "خلع", "تركيبات", "آخرى"];
 
     let patients=load(PATIENTS_KEY,seedPatients), 
         visits=load(VISITS_KEY,seedVisits), 
@@ -707,6 +776,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         expenses=load(EXPENSES_KEY,seedExpenses),
         inventory=load(INVENTORY_KEY,seedInventory),
         labs=load(LABS_KEY,seedLabs),
+        treatmentPlans=load(PLANS_KEY,[]),
         monthlyReports=load(MONTHLY_KEY,[]);
 
         migrateChannelData();
@@ -714,7 +784,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     let theme=localStorage.getItem(THEME_KEY)||"default";
     let currentRole=null, selectedLoginRole=null;
 
-    let view="dashboard", selectedPatientId=null, editingPatientId=null, editingVisitId=null, toastTimer, adminUnlocked=false, activeReportTab = "dash";
+    let view="dashboard", selectedPatientId=null, editingPatientId=null, editingVisitId=null, editingPlanId=null, planFormPlanId=null, planFormBlank=false, toastTimer, adminUnlocked=false, activeReportTab = "dash";
     let reportPeriod="month", reportCustom={from:"",to:""}, reportCompare=true;
     let narratives=(function(){try{const v=JSON.parse(localStorage.getItem(NARRATIVES_KEY)||"{}");return (v&&typeof v==="object"&&!Array.isArray(v))?v:{}}catch(e){return{}}})();
     let monthlySubView="list", selectedMonthlyId=null, monthlyDraft=null;
@@ -730,6 +800,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         localStorage.setItem(EXPENSES_KEY,JSON.stringify(expenses));
         localStorage.setItem(INVENTORY_KEY,JSON.stringify(inventory));
         localStorage.setItem(LABS_KEY,JSON.stringify(labs));
+        localStorage.setItem(PLANS_KEY,JSON.stringify(treatmentPlans));
         localStorage.setItem(MONTHLY_KEY,JSON.stringify(monthlyReports));
       }catch(e){}
     }
@@ -1251,6 +1322,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             totalExpenses: expenses.length,
             totalInventory: inventory.length,
             totalLabs: labs.length,
+            totalTreatmentPlans: treatmentPlans.length,
             totalMonthlyReports: monthlyReports.length,
             totalCustomLists: customLists.length,
             totalProcedures: procedures.length
@@ -1263,6 +1335,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             expenses,
             inventory,
             labs,
+            treatmentPlans,
             monthlyReports
           },
           settings: {
@@ -1285,12 +1358,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
     function getPatient(id){return patients.find(p=>p.id===id)}
     function getPatientVisits(id){return getVisibleVisits().filter(v=>v.patientId===id).sort((a,b)=>b.date.localeCompare(a.date))}
+    function getPatientPlans(id){return treatmentPlans.filter(t=>t.patientId===id).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
+    function planSummary(t){const parts=(t.cols||[]).map((c,i)=>{const n=String(c.count||"").trim();if(!n&&!String(c.notes||"").trim()&&!String(c.position||"").trim())return null;return PLAN_TYPES[i]+(n?(" ("+n+")"):"")}).filter(Boolean);return parts.length?parts.join("، "):"بدون بنود"}
     function visitProcedureNames(v){if(v.items&&v.items.length)return v.items.map(i=>i.procedure).join(" + ");return v.procedure||"إجراء طبي"}
     
     function visitRow(v,showActions=true){
       const p=getPatient(v.patientId);
       const name = p ? p.fullName : (v.patientName || "مريض غير مسجل");
-      return`<div class="visit-row"><div class="initial">${esc(letter(name))}</div><div class="row-main"><strong>${value(name)} · زيارة (${value(v.visitNum||"1")}) · ${value(visitProcedureNames(v))}</strong><span>${date(v.date)} (${value(v.shift||"صباح")}) · الطبيب: ${value(v.doctor||"د. عثمان")} · الشكوى: ${value(v.mainComplaint)}</span></div><div class="row-meta">${displayCost(v.cost)}<br><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></div>${showActions && p ?button("فتح الملف","open-patient",v.patientId,"icon-btn"):""}</div>`
+      return`<div class="visit-row"><div class="initial">${esc(letter(name))}</div><div class="row-main"><strong>${value(name)} · زيارة (${value(v.visitNum||"1")}) · ${value(visitProcedureNames(v))}</strong><span>${date(v.date)} (${value(v.shift||"صباح")}) · الطبيب: ${value(v.doctor||"د. عثمان")} · الشكوى: ${value(v.mainComplaint)}${v.planWorked?` · <strong>من الخطة العلاجية:</strong> ${esc(v.planWorked)}`:""}</span></div><div class="row-meta">${displayCost(v.cost)}<br><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></div>${showActions && p ?button("فتح الملف","open-patient",v.patientId,"icon-btn"):""}</div>`
     }
     
     
@@ -1680,14 +1755,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
     function patientsPage(){return`<section class="view"><div class="heading"><div><p class="eyebrow">الملفات الرقمية</p><h1>دليل المرضى</h1><p class="sub">ابحث وراجع سجلات المرضى، مع عدد الزيارات لكل مريض.</p></div><button class="primary" data-view="new-patient">＋ ملف مريض جديد</button></div><div class="toolbar"><input id="patientSearch" placeholder="بحث بالاسم أو رقم الملف أو الجوال..."><span class="sub">${patients.length} سجلات محفوظة</span></div><section class="panel" id="table">${patientTable(patients)}</section></section>`}
     
-    function patientTable(list){if(!list.length)return`<div class="empty">لا توجد نتائج مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>رقم الملف</th><th>اسم المريض</th><th>الهاتف</th><th>مصدر المعرفة</th><th>عدد الزيارات المتاحة</th><th>آخر زيارة</th><th>إجراءات</th></tr></thead><tbody>${list.map(p=>{const pv=getPatientVisits(p.id);const refStr = Array.isArray(p.referral)?p.referral.join("، "):value(p.referral);return`<tr><td>#${esc(p.file)}</td><td><strong>${value(p.fullName)}</strong></td><td dir="ltr">${value(p.phone)}</td><td><span class="badge blue">${refStr}</span></td><td><span class="badge gold">${pv.length} زيارة</span></td><td>${pv[0]?date(pv[0].date):"لا توجد"}</td><td><div class="button-row">${button("فتح الملف","open-patient",p.id)}${button("تسجيل زيارة","new-visit-for",p.id,"primary")}${adminUnlocked?button("حذف","delete-patient",p.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
+    function patientTable(list){if(!list.length)return`<div class="empty">لا توجد نتائج مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>رقم الملف</th><th>اسم المريض</th><th>الهاتف</th><th>مصدر المعرفة</th><th>عدد الزيارات المتاحة</th><th>آخر زيارة</th><th>إجراءات</th></tr></thead><tbody>${list.map(p=>{const pv=getPatientVisits(p.id);const refStr = Array.isArray(p.referral)?p.referral.join("، "):value(p.referral);return`<tr><td>#${esc(p.file)}</td><td><strong>${value(p.fullName)}</strong></td><td dir="ltr">${value(p.phone)}</td><td><span class="badge blue">${refStr}</span></td><td><span class="badge gold">${pv.length} زيارة</span></td><td>${pv[0]?date(pv[0].date):"لا توجد"}</td><td><div class="button-row">${button("فتح الملف","open-patient",p.id)}${button("تسجيل زيارة","new-visit-for",p.id,"primary")}${button("الخطة العلاجية","treatment-plan",p.id)}${adminUnlocked?button("حذف","delete-patient",p.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
     
     function visitsPage(){
       const activeVisits = getVisibleVisits();
       return`<section class="view"><div class="heading"><div><p class="eyebrow">المتابعة اليومية</p><h1>سجل الزيارات والحالات</h1><p class="sub">كل إجراء طبي تم تنفيذه مع المريض والمدفوعات والمستحقات.</p></div><button class="primary" data-view="new-visit">＋ تسجيل زيارة جديدة</button></div><div class="toolbar"><input id="visitSearch" placeholder="بحث باسم المريض أو الطبيب أو الشكوى..."><input id="visitDate" type="date" title="تصفية حسب التاريخ"><span class="sub">${activeVisits.length} زيارة مسجلة</span></div><section class="panel" id="visitsTable">${visitsTable(activeVisits)}</section></section>`
     }
     
-    function visitsTable(list){if(!list.length)return`<div class="empty">لا توجد زيارات مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>الرقم/التاريخ</th><th>المريض / الكرسي</th><th>الطبيب والشفت</th><th>الشكوى والتشخيص</th><th>المبالغ (إجمالي/مدفوع/دين)</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${list.sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{const p=getPatient(v.patientId);const name = p ? p.fullName : (v.patientName || "غير محدد");return`<tr><td><strong>زيارة (${value(v.visitNum||"1")})</strong><br><small class="sub">${date(v.date)}</small></td><td><strong>${value(name)}</strong><br><small class="sub">${value(v.chair||"كرسي 1")}</small></td><td><strong>${value(v.doctor||"د. عثمان")}</strong><br><span class="badge gold">${value(v.shift||"صباح")}</span></td><td><strong>الشكوى:</strong> ${value(v.mainComplaint)}<br><small class="sub"><strong>العلاج:</strong> ${value(visitProcedureNames(v))}</small></td><td><strong>الإجمالي:</strong> ${money(v.cost)}<br><small class="sub" style="color:var(--green)">مدفوع: ${money(v.paid||0)}</small><br><small class="sub" style="color:var(--red)">متبقي: ${money(v.due||0)}</small></td><td><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></td><td><div class="button-row">${button("تعديل","edit-visit",v.id)}${adminUnlocked?button("حذف","delete-visit",v.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
+    function visitsTable(list){if(!list.length)return`<div class="empty">لا توجد زيارات مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>الرقم/التاريخ</th><th>المريض / الكرسي</th><th>الطبيب والشفت</th><th>الشكوى والتشخيص</th><th>المبالغ (إجمالي/مدفوع/دين)</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${list.sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{const p=getPatient(v.patientId);const name = p ? p.fullName : (v.patientName || "غير محدد");return`<tr><td><strong>زيارة (${value(v.visitNum||"1")})</strong><br><small class="sub">${date(v.date)}</small></td><td><strong>${value(name)}</strong><br><small class="sub">${value(v.chair||"كرسي 1")}</small></td><td><strong>${value(v.doctor||"د. عثمان")}</strong><br><span class="badge gold">${value(v.shift||"صباح")}</span></td><td><strong>الشكوى:</strong> ${value(v.mainComplaint)}<br><small class="sub"><strong>العلاج:</strong> ${value(visitProcedureNames(v))}</small>${v.planWorked?`<br><small class="sub" style="color:var(--gold-dark)"><strong>من الخطة العلاجية:</strong> ${esc(v.planWorked)}</small>`:""}</td><td><strong>الإجمالي:</strong> ${money(v.cost)}<br><small class="sub" style="color:var(--green)">مدفوع: ${money(v.paid||0)}</small><br><small class="sub" style="color:var(--red)">متبقي: ${money(v.due||0)}</small></td><td><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></td><td><div class="button-row">${button("تعديل","edit-visit",v.id)}${adminUnlocked?button("حذف","delete-visit",v.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
     
     function lockedPage(title, desc){
       return `<section class="view"><div class="heading"><div><p class="eyebrow">صلاحيات محدودة</p><h1>${title}</h1><p class="sub">${desc}</p></div></div><div class="panel" style="padding:40px;text-align:center"><p style="font-size:16px;color:var(--muted)">يرجى تسجيل الدخول بحساب المدير للوصول لهذه الصفحة.</p><button class="primary" data-action="admin" style="margin-top:15px">تسجيل دخول المدير</button></div></section>`;
@@ -2675,6 +2750,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div class="button-row">
             <button class="secondary" data-view="patients">← رجوع لدليل المرضى</button>
             <button class="secondary" data-action="edit-patient" data-id="${p.id}">تعديل الملف</button>
+            <button class="secondary" data-action="treatment-plan" data-id="${p.id}">الخطة العلاجية</button>
             <button class="primary" data-action="new-visit-for" data-id="${p.id}">＋ تسجيل زيارة</button>
           </div>
         </div>
@@ -2703,6 +2779,371 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             ${pv.length ? pv.map(v => visitRow(v, false)).join('') : '<div class="empty">لا توجد زيارات متاحة لهذا المريض في هذه الوردية.</div>'}
           </div>
         </div>
+      </section>`;
+    }
+
+    /* ================= متابعة المرضى بعد الزيارة ================= */
+    function waPhone(phone){
+      let d = String(phone||"").replace(/\D/g,"");
+      if(!d) return "";
+      if(d.startsWith("00")) d = d.slice(2);
+      if(d.startsWith("0")) d = "249" + d.slice(1);
+      return d;
+    }
+
+    function planProgressRows(plan){
+      return PLAN_TYPES.map((t,i)=>({t,i,c:(plan&&plan.cols&&plan.cols[i])||{}})).filter(r=>{
+        return String(r.c.count||"").trim() || String(r.c.done||"").trim() || String(r.c.position||"").trim() || String(r.c.notes||"").trim();
+      });
+    }
+    function planProgressPct(rows){
+      let tp=0,td=0;
+      rows.forEach(r=>{const n=Number(r.c.count||0),d=Number(r.c.done||0);if(n>0){tp+=n;td+=Math.min(d,n);}});
+      return tp>0?Math.min(100,Math.round(td/tp*100)):(rows.some(r=>Number(r.c.done||0)>0)?100:0);
+    }
+
+    function buildFollowUpMessage(p, plan){
+      const name = String(p.fullName||"").trim();
+      const L = [];
+      L.push(`مرحباً ${name} 🌿`);
+      L.push(`من فريق عيادة أوراس لطب الأسنان 🦷`);
+      L.push("");
+      if(plan){
+        const rows = planProgressRows(plan);
+        L.push(`نطمئن عليك بعد زيارتنا وندعوك لمتابعة خطة العلاج 📋`);
+        if(rows.length){
+          L.push(`تقدّمك في الخطة حتى الآن:`);
+          rows.forEach(r=>{
+            const n=Number(r.c.count||0), d=Number(r.c.done||0);
+            const pct = n>0?Math.min(100,Math.round(d/n*100)):(d>0?100:0);
+            L.push(`🔹 ${r.t}: ${d} من ${n} (${pct}%) ${n>0&&d>=n?"✅":""}`);
+          });
+          L.push(`📊 إجمالي التقدم: ${planProgressPct(rows)}% من الخطة`);
+        } else {
+          L.push(`خطة العلاج مسجلة ومتابعتها جارية 📋`);
+        }
+      } else {
+        L.push(`نتمنى لك الصحة والعافية 🤍`);
+      }
+      L.push("");
+      L.push(`لا تتردد بالتواصل معنا للحجز أو الاستفسار 📲`);
+      L.push(`عيادة أوراس لطب الأسنان ⭐`);
+      return L.join("\n");
+    }
+
+    function planPdfSheetHtml(p, plan){
+      const rows = planProgressRows(plan);
+      const opct = planProgressPct(rows);
+      const progressLine = rows.map(r=>{
+        const n=Number(r.c.count||0), d=Number(r.c.done||0);
+        return `${r.t}: ${d}/${n}`;
+      }).join(" · ");
+      return `<div class="pdf-sheet">
+        <div class="pdf-head">
+          <div class="pdf-brand"><span class="mark">أ</span><div><strong>عيادة أوراس لطب الأسنان</strong><small>ORAS Dental Clinic</small></div></div>
+          <div class="pdf-title">ملاحظة الخطة العلاجية</div>
+          <div class="pdf-meta">
+            <div><b>اسم المريض:</b> ${esc(p.fullName||"")}</div>
+            <div><b>رقم الملف:</b> ${esc(p.file||"")}</div>
+            <div><b>الجوال:</b> <span dir="ltr">${esc(p.phone||"—")}</span></div>
+            <div><b>تاريخ الخطة:</b> ${date(plan.date)}</div>
+          </div>
+        </div>
+        <table class="plan-table pdf-table">
+          <colgroup><col style="width:19%">${PLAN_TYPES.map(()=>'<col style="width:10.3%">').join("")}<col style="width:9.1%"></colgroup>
+          <thead>
+            <tr>
+              <th class="plan-advice-col">◆ المواعظ</th>
+              ${PLAN_TYPES.map((t,i)=>`<th><span class="plan-num">${i<6?i+1:""}</span><span class="plan-type">${t}</span></th>`).join("")}
+              <th class="plan-rowhead"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="plan-advice-col" rowspan="3"><div class="pdf-advice-cell">${esc(plan.advice||"—")}</div></td>
+              ${rows.map(()=>`<td></td>`).length?PLAN_TYPES.map((t,i)=>`<td class="pdf-val">${esc((plan.cols[i]||{}).count||"")||"—"}</td>`).join(""):PLAN_TYPES.map(()=>`<td class="pdf-val">—</td>`).join("")}
+              <td class="plan-rowhead">عدد<br>الأسنان</td>
+            </tr>
+            <tr>
+              ${PLAN_TYPES.map((t,i)=>`<td class="pdf-val">${esc((plan.cols[i]||{}).position||"")||"—"}</td>`).join("")}
+              <td class="plan-rowhead">الموضع</td>
+            </tr>
+            <tr>
+              ${PLAN_TYPES.map((t,i)=>`<td class="pdf-val pdf-val-notes">${esc((plan.cols[i]||{}).notes||"")||"—"}</td>`).join("")}
+              <td class="plan-rowhead">ملاحظات</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="pdf-progress">✔️ تقدم الخطة حتى الآن: <b>${opct}%</b>${progressLine?` — ${esc(progressLine)}`:""}</div>
+        <div class="plan-signs pdf-signs">
+          <div class="plan-sign"><label>توقيع الطبيب:</label><span>${esc(plan.doctorSign||"")}</span></div>
+          <div class="plan-sign"><label>توقيع المريض:</label><span>${esc(plan.patientSign||"")}</span></div>
+        </div>
+      </div>`;
+    }
+
+    async function sendPlanPdf(pid){
+      const p = getPatient(pid);
+      if(!p){ message("لم يتم العثور على المريض."); return; }
+      const plan = getPatientPlans(p.id)[0];
+      if(!plan){ message("لا توجد خطة علاجية محفوظة لهذا المريض بعد — سجّل الخطة أولاً من ملفه."); return; }
+      message("جاري تجهيز ملف الخطة العلاجية PDF...");
+      let sheet = document.getElementById("planPdfSheet");
+      if(!sheet){
+        sheet = document.createElement("div");
+        sheet.id = "planPdfSheet";
+        document.body.appendChild(sheet);
+      }
+      sheet.innerHTML = planPdfSheetHtml(p, plan);
+      const fname = ("خطة-علاجية-" + (p.fullName||"مريض") + " #" + (p.file||"") + ".pdf").replace(/[\\/:*?"<>|]/g,"-");
+      try {
+        if(typeof html2canvas === "undefined" || typeof jspdf === "undefined" || !jspdf.jsPDF){
+          throw new Error("PDF libraries not loaded");
+        }
+        const canvas = await html2canvas(sheet, {scale:2, backgroundColor:"#ffffff", useCORS:true, logging:false});
+        const { jsPDF } = jspdf;
+        const pdf = new jsPDF({orientation:"landscape", unit:"mm", format:"a4"});
+        const pageW = 297, pageH = 210;
+        const imgW = pageW;
+        const imgH = canvas.height * imgW / canvas.width;
+        const img = canvas.toDataURL("image/jpeg", 0.92);
+        let heightLeft = imgH, position = 0;
+        pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+        while(heightLeft > 0){
+          position = position - pageH;
+          pdf.addPage();
+          pdf.addImage(img, "JPEG", 0, position, imgW, imgH);
+          heightLeft -= pageH;
+        }
+        pdf.save(fname);
+        message("تم تجهيز وتنزيل ملف الخطة العلاجية PDF.");
+      } catch(err){
+        console.warn("PDF fallback to print:", err);
+        message("تعذر توليد الملف مباشرة — ستُفتح نافذة الطباعة، اختر «حفظ كـ PDF».");
+        try{
+          let area = document.getElementById("printArea");
+          if(!area){ area = document.createElement("div"); area.id="printArea"; document.body.appendChild(area); }
+          area.innerHTML = sheet.innerHTML;
+          document.body.classList.add("printing-comprehensive");
+          const onAfter = () => {
+            document.body.classList.remove("printing-comprehensive");
+            area.innerHTML = "";
+            window.removeEventListener("afterprint", onAfter);
+          };
+          window.addEventListener("afterprint", onAfter);
+          setTimeout(()=>{ window.print(); }, 60);
+        } catch(e2){ console.warn(e2); }
+      }
+    }
+
+    function showFollowUpMessage(pid){
+      const p = getPatient(pid);
+      if(!p){ message("لم يتم العثور على المريض."); return; }
+      const plan = getPatientPlans(p.id)[0] || null;
+      const msg = buildFollowUpMessage(p, plan);
+      const phone = waPhone(p.phone);
+      const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "";
+      const modal = document.getElementById("appModal");
+      const form = document.getElementById("appModalForm");
+      const bodyEl = document.getElementById("appModalBody");
+      const submitBtn = document.getElementById("appModalSubmit");
+      const cancelBtn = document.getElementById("appModalCancel");
+      const closeBtn = document.getElementById("appModalClose");
+      if(!modal || !bodyEl || !cancelBtn){ return; }
+      document.getElementById("appModalTitle").textContent = "رسالة المتابعة عبر واتساب";
+      bodyEl.style.display = "block";
+      bodyEl.style.gap = "";
+      bodyEl.innerHTML = `
+        <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">الرسالة موجهة إلى: <strong>${esc(p.fullName)}</strong> · الجوال: <span dir="ltr">${esc(phone||p.phone||"—")}</span></p>
+        <div class="wa-bubble" dir="rtl">${msg.split("\n").map(l=>`<div>${l?esc(l):"&nbsp;"}</div>`).join("")}</div>
+        <div class="button-row" style="margin-top:14px">
+          <button type="button" class="secondary" id="waCopyBtn">📋 نسخ الرسالة</button>
+          ${waLink ? `<button type="button" class="primary" id="waOpenBtn" style="background:#128c4b;border-color:#128c4b">📲 فتح واتساب</button>` : `<span class="sub">لا يوجد رقم جوال مسجل لهذا المريض — أضفه في الملف أولاً.</span>`}
+        </div>`;
+      if(submitBtn) submitBtn.style.display = "none";
+      const restore = () => {
+        modal.classList.add("hidden");
+        if(submitBtn) submitBtn.style.display = "";
+        cancelBtn.removeEventListener("click", onCancel);
+        if(closeBtn) closeBtn.removeEventListener("click", onCancel);
+        document.removeEventListener("keydown", onKey);
+      };
+      const onKey = (e) => { if(e.key==="Escape"||e.key==="Esc"){ e.preventDefault(); restore(); } };
+      const onCancel = () => restore();
+      cancelBtn.addEventListener("click", onCancel);
+      if(closeBtn) closeBtn.addEventListener("click", onCancel);
+      document.addEventListener("keydown", onKey);
+      const copyBtn = document.getElementById("waCopyBtn");
+      if(copyBtn) copyBtn.addEventListener("click", ()=>{
+        const done = ()=>message("تم نسخ الرسالة إلى الحافظة.");
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(msg).then(done).catch(()=>fallbackCopy(msg, done));
+        } else fallbackCopy(msg, done);
+      });
+      const openBtn = document.getElementById("waOpenBtn");
+      if(openBtn) openBtn.addEventListener("click", ()=>{ window.open(waLink,"_blank","noopener"); });
+    }
+    function fallbackCopy(text, done){
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-10000px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        done();
+      } catch(e){ message("تعذر النسخ التلقائي — انسخ الرسالة يدوياً."); }
+    }
+
+    function followUpPage(){
+      const cutoff = new Date(Date.now() - 24*3600*1000);
+      const recent = getVisibleVisits().filter(v=>{
+        try{ return new Date(v.date+"T23:59:59") >= cutoff; }catch(e){ return false; }
+      });
+      const byPatient = {};
+      recent.forEach(v=>{
+        const key = v.patientId || v.patientName || "?";
+        const cur = byPatient[key];
+        if(!cur || String(v.date) > String(cur.date)) byPatient[key] = v;
+      });
+      const cards = Object.values(byPatient).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+      return `<section class="view">
+        <div class="heading">
+          <div><p class="eyebrow">ما بعد الزيارة</p><h1>متابعة المرضى</h1><p class="sub">تنبيه بالمرضى الذين زاروا العيادة خلال آخر 24 ساعة — أرسل لهم خطة العلاج PDF أو رسالة متابعة عبر واتساب.</p></div>
+        </div>
+        <div class="panel fu-alert">
+          <div class="panel-head">
+            <div><h2>🔔 تنبيه المتابعة — آخر 24 ساعة</h2><p>هؤلاء المرضى زاروا العيادة حديثاً ويُفضّل التواصل معهم الآن.</p></div>
+            <span class="badge ${cards.length?"gold":"green"}">${cards.length ? cards.length+" مريض بحاجة لمتابعة" : "لا يوجد مرضى خلال آخر 24 ساعة"}</span>
+          </div>
+          ${cards.length ? cards.map(v=>{
+            const p = getPatient(v.patientId);
+            const name = p ? p.fullName : (v.patientName || "مريض غير مسجل");
+            const pv = p ? getPatientVisits(p.id) : [];
+            const refStr = p ? (Array.isArray(p.referral)?p.referral.join("، "):value(p.referral)) : "غير مسجل";
+            return `<div class="fu-card">
+              <div class="initial">${esc(letter(name))}</div>
+              <div class="row-main">
+                <strong>${p?"#"+esc(p.file)+" · ":""}${esc(name)}</strong>
+                <span>${p?`📱 <span dir="ltr">${esc(p.phone)}</span> · `:""}آخر زيارة: ${date(v.date)} (${value(v.shift||"صباح")})${p?` · ${pv.length} زيارة بالملف`:""}</span>
+              </div>
+              <div class="row-meta"><span class="badge blue">${refStr}</span></div>
+              <div class="button-row">
+                ${p?button("📄 إرسال الخطة العلاجية","send-plan-pdf",p.id):""}
+                ${p?button("📲 رسائل المتابعة","follow-up-message",p.id,"primary"):""}
+              </div>
+            </div>`;
+          }).join("") : `<div class="empty">لا توجد زيارات خلال آخر 24 ساعة — ستظهر أسماء المرضى هنا تلقائياً بعد كل زيارة.</div>`}
+        </div>
+      </section>`;
+    }
+
+    function planProgressSection(p, plan){
+      const logVisits = getPatientVisits(p.id).filter(v=>String(v.planWorked||"").trim());
+      if(!plan) return `<div class="panel" style="padding:16px 18px"><p style="margin:0;font-size:13px;color:var(--muted)"><strong>تقدم الخطة العلاجية:</strong> احفظ الخطة العلاجية أولًا — ثم يتابع هذا الجدول ما وصل إليه المريض من تنفيذ الخطة.</p></div>`;
+      const rows = PLAN_TYPES.map((name,i)=>({name,i,c:plan.cols[i]||{}})).filter(r=>{const c=r.c;return String(c.count||"").trim()||String(c.position||"").trim()||String(c.notes||"").trim()||String(c.done||"").trim();});
+      let totPlan=0,totDone=0;
+      rows.forEach(r=>{const n=Number(r.c.count||0);const d=Number(r.c.done||0);if(n>0){totPlan+=n;totDone+=Math.min(d,n);}});
+      const pct = totPlan>0 ? Math.min(100,Math.round(totDone/totPlan*100)) : (rows.some(r=>Number(r.c.done||0)>0)?100:0);
+      const rowHtml = rows.map(r=>{
+        const n=Number(r.c.count||0), d=Number(r.c.done||0);
+        const rowPct = n>0 ? Math.min(100,Math.round(d/n*100)) : (d>0?100:0);
+        const status = (n>0 && d>=n) ? '<span class="badge green">مكتملة</span>' : (d>0 ? '<span class="badge gold">قيد التنفيذ</span>' : '<span class="badge gray">لم تبدأ</span>');
+        return `<tr>
+          <td><strong>${r.name}</strong></td>
+          <td>${r.c.position?esc(r.c.position):"—"}</td>
+          <td style="text-align:center">${n||"—"}</td>
+          <td style="text-align:center"><input type="number" min="0" class="prog-done-input" name="p${r.i}_done" value="${esc(r.c.done)}" placeholder="0" title="عدد الأسنان المنجزة"></td>
+          <td><div class="prog-wrap"><div class="prog-bar${n>0&&d>=n?" full":""}" style="width:${rowPct}%"></div></div></td>
+          <td>${status}</td>
+        </tr>`;
+      }).join("");
+      return `<div class="panel">
+        <div class="panel-head"><div><h2>تقدم الخطة العلاجية</h2><p>متابعة ما وصل إليه المريض من تنفيذ الخطة — حدّث «المنجز» بعد كل جلسة ثم احفظ.</p></div><span class="badge ${pct>=100?"green":"gold"}" style="font-size:12px;white-space:nowrap">الإجمالي: ${pct}%</span></div>
+        ${rows.length ? `<form id="planProgressForm"><div class="table-wrap"><table>
+          <thead><tr><th>نوع العلاج</th><th>الموضع</th><th>المخطط</th><th>المنجز</th><th>التقدم</th><th>الحالة</th></tr></thead>
+          <tbody>${rowHtml}</tbody>
+        </table></div>
+        <div class="form-footer" style="border-top:1px solid var(--line)"><div class="button-row"><button type="submit" class="primary">حفظ تحديث التقدم</button></div></div>
+        </form>` : `<div class="empty">لا توجد بنود في الخطة بعد — املأ عدد الأسنان أو الموضع في الاستمارة أعلاه ثم احفظها.</div>`}
+        <div class="detail-block" style="margin-top:18px">
+          <h3>سجل ما تم من الخطة في الزيارات (${logVisits.length})</h3>
+          ${logVisits.length ? logVisits.map(v=>`<div class="visit-row"><div class="initial">✓</div><div class="row-main"><strong>${date(v.date)} · ${value(v.doctor||"د. عثمان")} · ${value(v.shift||"صباح")}</strong><span>${esc(v.planWorked)}</span></div></div>`).join("") : `<div class="empty">لم يُسجل بعد أي إجراء من الخطة في الزيارات — اكتب «ما تم عمله من الخطة العلاجية» عند تسجيل الزيارة ليظهر هنا تلقائيًا.</div>`}
+        </div>
+      </div>`;
+    }
+
+    function treatmentPlanPage(p){
+      if(!p) return `<section class="view"><div class="heading"><div><h1>الخطة العلاجية</h1><p class="sub">لم يتم العثور على ملف المريض المطلوب.</p></div><button class="secondary" data-view="patients">← رجوع لدليل المرضى</button></div><div class="panel empty">لم يتم العثور على سجل المريض أو تم حذفه.</div></section>`;
+      const plans = getPatientPlans(p.id);
+      let plan = (plans.find(t=>t.id===editingPlanId)) || plans[0] || null;
+      if(planFormBlank){ plan = null; planFormBlank = false; }
+      planFormPlanId = plan ? plan.id : null;
+      const cols = (plan && Array.isArray(plan.cols) && plan.cols.length===PLAN_TYPES.length) ? plan.cols : PLAN_TYPES.map(()=>({count:"",position:"",notes:""}));
+      const dateVal = (plan && plan.date) || today;
+      return `<section class="view">
+        <div class="heading">
+          <div><p class="eyebrow">متابعة ما بعد الزيارة</p><h1>الخطة العلاجية — ${esc(p.fullName)} (#${esc(p.file)})</h1><p class="sub">استمارة خطة العلاج: نوع العلاج، عدد الأسنان، الموضع، الملاحظات، والمواعظ — بدون رسوم الأسنان.</p></div>
+          <div class="button-row">
+            <button class="secondary" data-view="patients">← رجوع لدليل المرضى</button>
+            <button class="secondary" data-action="new-plan" data-id="${p.id}">＋ خطة علاجية جديدة</button>
+            ${adminUnlocked && plan ? button("حذف الخطة","delete-plan",plan.id,"danger") : ""}
+            <button class="primary" data-action="print">طباعة</button>
+          </div>
+        </div>
+        ${plans.length ? `<div class="panel" style="padding:14px 18px"><p style="margin:0 0 9px;font-size:12px;font-weight:800;color:var(--muted)">خطط العلاج المسجلة (${plans.length}) — اضغط على أي خطة لتحميلها في الاستمارة أعلاه:</p><div class="button-row" style="flex-wrap:wrap">${plans.map(t=>`<button class="secondary plan-history-chip" data-action="view-plan" data-id="${t.id}" style="${plan&&t.id===plan.id?"border-color:var(--gold);background:#fffdf7;":""}">${date(t.date)} · ${esc(planSummary(t))}</button>`).join("")}</div></div>` : `<div class="panel" style="padding:14px 18px"><p style="margin:0;font-size:13px;color:var(--muted)">لا توجد خطة علاجية محفوظة لهذا المريض بعد — املأ الاستمارة التالية ثم احفظها.</p></div>`}
+        <form id="planForm" class="panel plan-sheet">
+          <div class="plan-top">
+            <h2>ملاحظة الخطة العلاجية</h2>
+            <div class="plan-date"><label for="planDate">التاريخ:</label><input type="date" id="planDate" name="date" value="${esc(dateVal)}"></div>
+          </div>
+          <div class="plan-checks">
+            <label><input type="checkbox" name="informed" ${plan&&plan.informed?"checked":""}> تم إبلاغ المريض</label>
+            <label><input type="checkbox" name="explained" ${plan&&plan.explained?"checked":""}> تم شرح الحالة</label>
+            <label><input type="checkbox" name="planShown" ${plan&&plan.planShown?"checked":""}> تم عرض خطة العلاج</label>
+          </div>
+          <div class="plan-table-wrap">
+            <table class="plan-table">
+              <colgroup><col style="width:19%">${PLAN_TYPES.map(()=>'<col style="width:10.3%">').join("")}<col style="width:9.1%"></colgroup>
+              <thead>
+                <tr>
+                  <th class="plan-advice-col">◆ المواعظ</th>
+                  ${PLAN_TYPES.map((t,i)=>`<th><span class="plan-num">${i<6?i+1:""}</span><span class="plan-type">${t}</span></th>`).join("")}
+                  <th class="plan-rowhead"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="plan-advice-col" rowspan="3"><textarea name="advice" placeholder="اكتب المواعظ والتعليمات التي تُوصي بها للمريض بعد العلاج...">${esc(plan&&plan.advice||"")}</textarea></td>
+                  ${cols.map((c,i)=>`<td><input type="number" min="0" name="c${i}_count" value="${esc(c.count)}" placeholder="0" title="عدد الأسنان"></td>`).join("")}
+                  <td class="plan-rowhead">عدد<br>الأسنان</td>
+                </tr>
+                <tr>
+                  ${cols.map((c,i)=>`<td><input name="c${i}_pos" value="${esc(c.position)}" placeholder="الموضع" title="الموضع (وصف أو أرقام الأسنان)"></td>`).join("")}
+                  <td class="plan-rowhead">الموضع</td>
+                </tr>
+                <tr>
+                  ${cols.map((c,i)=>`<td><textarea name="c${i}_notes" placeholder="ملاحظات...">${esc(c.notes)}</textarea></td>`).join("")}
+                  <td class="plan-rowhead">ملاحظات</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="plan-signs">
+            <div class="plan-sign"><label>توقيع الطبيب:</label><input name="doctorSign" value="${esc(plan&&plan.doctorSign||"")}" placeholder="اسم الطبيب / التوقيع"></div>
+            <div class="plan-sign"><label>توقيع المريض:</label><input name="patientSign" value="${esc(plan&&plan.patientSign||"")}" placeholder="توقيع المريض"></div>
+          </div>
+          <div class="form-footer">
+            <div class="button-row">
+              <button type="button" class="secondary" data-view="patients">إلغاء</button>
+              <button type="submit" class="primary">${plan?"حفظ تعديلات الخطة":"حفظ الخطة العلاجية"}</button>
+            </div>
+          </div>
+        </form>
+        ${planProgressSection(p, plan)}
       </section>`;
     }
 
@@ -2761,6 +3202,13 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             </div>
           </div>
 
+          <div class="form-section">
+            <div class="section-title"><span class="section-num">4</span><h2>متابعة الخطة العلاجية</h2></div>
+            <div class="field"><label>ما تم عمله من الخطة العلاجية</label>
+              <textarea name="planWorked" placeholder="سجل الإجراءات التي تم تنفيذها من خطة العلاج في هذه الزيارة...">${esc(v.planWorked||"")}</textarea>
+            </div>
+          </div>
+
           <div class="form-footer">
             <div class="button-row">
               <button type="button" class="secondary" data-view="visits">إلغاء</button>
@@ -2797,7 +3245,9 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       else if(view==="new-patient") c.innerHTML = patientForm();
       else if(view==="edit-patient") c.innerHTML = patientForm(getPatient(editingPatientId));
       else if(view==="patient-detail") c.innerHTML = patientDetail(getPatient(selectedPatientId));
+      else if(view==="treatment-plan") c.innerHTML = treatmentPlanPage(getPatient(selectedPatientId));
       else if(view==="visits") c.innerHTML = visitsPage();
+      else if(view==="follow-up") c.innerHTML = followUpPage();
       else if(view==="new-visit") c.innerHTML = visitForm();
       else if(view==="edit-visit") c.innerHTML = visitForm(visits.find(v=>v.id===editingVisitId));
       else if(view==="expenses") c.innerHTML = expensesPage();
@@ -2902,6 +3352,64 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         save();
         view = "visits";
         render();
+      });
+
+      document.getElementById("planForm")?.addEventListener("submit", e=>{
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const cols = PLAN_TYPES.map((t,i)=>({
+          count: String(fd.get("c"+i+"_count")||"").trim(),
+          position: String(fd.get("c"+i+"_pos")||"").trim(),
+          notes: String(fd.get("c"+i+"_notes")||"").trim()
+        }));
+        // الاحتفاظ بتقدم التنفيذ (المنجز) المسجل مسبقًا عند تعديل بيانات الخطة
+        const mergePlan = treatmentPlans.find(t=>t.id===(editingPlanId||planFormPlanId));
+        if(mergePlan && Array.isArray(mergePlan.cols)){
+          cols.forEach((c,i)=>{ if(mergePlan.cols[i] && "done" in mergePlan.cols[i]) c.done = mergePlan.cols[i].done; });
+        }
+        const data = {
+          patientId: selectedPatientId,
+          date: String(fd.get("date")||today),
+          cols,
+          advice: String(fd.get("advice")||"").trim(),
+          informed: !!fd.get("informed"),
+          explained: !!fd.get("explained"),
+          planShown: !!fd.get("planShown"),
+          doctorSign: String(fd.get("doctorSign")||"").trim(),
+          patientSign: String(fd.get("patientSign")||"").trim()
+        };
+        const editId = editingPlanId || planFormPlanId;
+        const idx = editId ? treatmentPlans.findIndex(t=>t.id===editId) : -1;
+        if(idx!==-1){
+          treatmentPlans[idx] = {...treatmentPlans[idx], ...data};
+          planFormPlanId = treatmentPlans[idx].id;
+          message("تم حفظ تعديلات الخطة العلاجية بنجاح.");
+        } else {
+          data.id = String(Date.now());
+          treatmentPlans.push(data);
+          planFormPlanId = data.id;
+          message("تم حفظ الخطة العلاجية بنجاح.");
+        }
+        save();
+        view = "treatment-plan";
+        render();
+      });
+
+      document.getElementById("planProgressForm")?.addEventListener("submit", e=>{
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const idx = treatmentPlans.findIndex(t=>t.id===(editingPlanId||planFormPlanId));
+        if(idx===-1){ message("لا توجد خطة محفوظة لمتابعة تقدمها."); return; }
+        PLAN_TYPES.forEach((t,i)=>{
+          const val = fd.get("p"+i+"_done");
+          if(val!==null && treatmentPlans[idx].cols[i]){
+            treatmentPlans[idx].cols[i].done = String(val).trim();
+          }
+        });
+        treatmentPlans[idx].progressUpdatedAt = today;
+        save();
+        render();
+        message("تم حفظ تقدم الخطة العلاجية.");
       });
 
       content.addEventListener("change", e=>{
@@ -3161,6 +3669,39 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           editingVisitId = null;
           view = "new-visit";
           render();
+        } else if(act==="treatment-plan"){
+          selectedPatientId = id;
+          editingPlanId = null;
+          view = "treatment-plan";
+          render();
+        } else if(act==="new-plan"){
+          selectedPatientId = id || selectedPatientId;
+          editingPlanId = null;
+          planFormBlank = true;
+          view = "treatment-plan";
+          render();
+          setTimeout(()=>{const d=document.getElementById("planDate");if(d){d.focus();d.select&&d.select();}},50);
+        } else if(act==="view-plan"){
+          editingPlanId = id;
+          view = "treatment-plan";
+          render();
+          window.scrollTo({top:0,behavior:"smooth"});
+        } else if(act==="delete-plan"){
+          if(!adminUnlocked){
+            message("حذف الخطط العلاجية متاح فقط في وضع المدير.");
+            return;
+          }
+          if(confirm("هل أنت متأكد من حذف هذه الخطة العلاجية؟")){
+            treatmentPlans = treatmentPlans.filter(t=>t.id!==id);
+            if(editingPlanId===id) editingPlanId = null;
+            save();
+            render();
+            message("تم حذف الخطة العلاجية.");
+          }
+        } else if(act==="send-plan-pdf"){
+          sendPlanPdf(id);
+        } else if(act==="follow-up-message"){
+          showFollowUpMessage(id);
         } else if(act==="edit-patient"){
           editingPatientId = id;
           view = "edit-patient";
@@ -3518,6 +4059,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             if(Array.isArray(source.expenses)) expenses = source.expenses;
             if(Array.isArray(source.inventory)) inventory = source.inventory;
             if(Array.isArray(source.labs)) labs = source.labs;
+            if(Array.isArray(source.treatmentPlans)) treatmentPlans = source.treatmentPlans;
             if(Array.isArray(source.monthlyReports)) monthlyReports = source.monthlyReports;
 
             if(parsed.settings && parsed.settings.theme){
