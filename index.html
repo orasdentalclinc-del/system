@@ -2791,6 +2791,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       return d;
     }
 
+    // رابط واتساب ويب لفتح دردشة المريض مباشرة (مع نص اختياري جاهز)
+    function waWebUrl(phone, text){
+      const d = waPhone(phone);
+      if(!d) return "";
+      const u = "https://web.whatsapp.com/send?phone=" + d;
+      return text ? u + "&text=" + encodeURIComponent(text) : u;
+    }
+
     function planProgressRows(plan){
       return PLAN_TYPES.map((t,i)=>({t,i,c:(plan&&plan.cols&&plan.cols[i])||{}})).filter(r=>{
         return String(r.c.count||"").trim() || String(r.c.done||"").trim() || String(r.c.position||"").trim() || String(r.c.notes||"").trim();
@@ -2882,12 +2890,27 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </div>`;
     }
 
+    function planPdfCaption(p){
+      const L = [];
+      L.push(`مرحباً ${String(p.fullName||"").trim()} 🌿`);
+      L.push(`من فريق عيادة أوراس لطب الأسنان 🦷`);
+      L.push(`مرفق لكم خطة العلاج الكاملة 📋`);
+      L.push(`نتمنى لكم شفاءً سريعاً 🤍`);
+      return L.join("\n");
+    }
+
     async function sendPlanPdf(pid){
       const p = getPatient(pid);
       if(!p){ message("لم يتم العثور على المريض."); return; }
       const plan = getPatientPlans(p.id)[0];
       if(!plan){ message("لا توجد خطة علاجية محفوظة لهذا المريض بعد — سجّل الخطة أولاً من ملفه."); return; }
-      message("جاري تجهيز ملف الخطة العلاجية PDF...");
+      // فتح محادثة واتساب ويب مع المريض فوراً (داخل ضغطة الزر حتى لا يحجبها المتصفح)
+      const chatUrl = waWebUrl(p.phone, planPdfCaption(p));
+      let chatOpened = false;
+      if(chatUrl){
+        try{ window.open(chatUrl, "_blank", "noopener"); chatOpened = true; }catch(e){ console.warn("wa web open failed", e); }
+      }
+      message(chatOpened ? "تم فتح محادثة واتساب ويب — جارٍ تجهيز ملف PDF، أرفقه في المحادثة بعد نزوله." : "لا يوجد رقم جوال مسجل — جارٍ تجهيز ملف PDF فقط.");
       let sheet = document.getElementById("planPdfSheet");
       if(!sheet){
         sheet = document.createElement("div");
@@ -2917,10 +2940,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           heightLeft -= pageH;
         }
         pdf.save(fname);
-        message("تم تجهيز وتنزيل ملف الخطة العلاجية PDF.");
+        message(chatOpened ? "تم تنزيل ملف الخطة PDF — أرفقه الآن في المحادثة المفتوحة وأرسله للمريض." : "تم تجهيز وتنزيل ملف الخطة العلاجية PDF.");
       } catch(err){
         console.warn("PDF fallback to print:", err);
-        message("تعذر توليد الملف مباشرة — ستُفتح نافذة الطباعة، اختر «حفظ كـ PDF».");
+        message(chatOpened ? "تعذر توليد الملف مباشرة — ستُفتح نافذة الطباعة (اختر «حفظ كـ PDF»)، المحادثة مفتوحة." : "تعذر توليد الملف مباشرة — ستُفتح نافذة الطباعة، اختر «حفظ كـ PDF».");
         try{
           let area = document.getElementById("printArea");
           if(!area){ area = document.createElement("div"); area.id="printArea"; document.body.appendChild(area); }
@@ -2943,7 +2966,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const plan = getPatientPlans(p.id)[0] || null;
       const msg = buildFollowUpMessage(p, plan);
       const phone = waPhone(p.phone);
-      const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : "";
+      const waLink = waWebUrl(p.phone, msg);
       const modal = document.getElementById("appModal");
       const form = document.getElementById("appModalForm");
       const bodyEl = document.getElementById("appModalBody");
@@ -2959,7 +2982,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         <div class="wa-bubble" dir="rtl">${msg.split("\n").map(l=>`<div>${l?esc(l):"&nbsp;"}</div>`).join("")}</div>
         <div class="button-row" style="margin-top:14px">
           <button type="button" class="secondary" id="waCopyBtn">📋 نسخ الرسالة</button>
-          ${waLink ? `<button type="button" class="primary" id="waOpenBtn" style="background:#128c4b;border-color:#128c4b">📲 فتح واتساب</button>` : `<span class="sub">لا يوجد رقم جوال مسجل لهذا المريض — أضفه في الملف أولاً.</span>`}
+          ${waLink ? `<button type="button" class="primary" id="waOpenBtn" style="background:#128c4b;border-color:#128c4b">📲 فتح واتساب ويب (دردشة المريض)</button>` : `<span class="sub">لا يوجد رقم جوال مسجل لهذا المريض — أضفه في الملف أولاً.</span>`}
         </div>`;
       if(submitBtn) submitBtn.style.display = "none";
       const restore = () => {
