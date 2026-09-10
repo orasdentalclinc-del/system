@@ -120,6 +120,72 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}button:focus-vis
     .report-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--line);padding-bottom:10px;flex-wrap:wrap;}
     .report-tabs button{padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:bold;color:var(--muted);transition:all 0.2s;font-size:12px}
     .report-tabs button.active{background:var(--gold);color:var(--ink);border-color:var(--gold);}
+    /* ===== نظام التقارير الجديد ===== */
+    .report-toolbar{position:sticky;top:74px;z-index:9;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+    .report-chips{display:flex;gap:6px;flex-wrap:wrap}
+    .report-chips button{padding:8px 13px;border-radius:99px;border:1px solid var(--line);background:var(--paper);font-size:12px;font-weight:700;color:var(--muted)}
+    .report-chips button.active{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+    .report-custom{display:flex;gap:8px;align-items:center;font-size:12px}
+    .report-custom input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--paper);height:auto;width:auto}
+    .report-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
+    .period-line{color:var(--muted);font-size:12px;margin:0 2px 16px}
+    .alerts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:18px}
+    .alert{border-radius:14px;padding:14px 16px;border:1px solid;font-size:12.5px;line-height:1.9}
+    .alert b{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:4px}
+    .alert.red{background:#fdf1f0;border-color:#ecc8c5;color:#6d2f2a}.alert.red b{color:var(--red)}
+    .alert.amber{background:#fff9e9;border-color:#e8d5a0;color:#6b5118}.alert.amber b{color:#8a6a1d}
+    .alert.blue{background:#eef4f9;border-color:#c9d9e6;color:#2c4d66}.alert.blue b{color:var(--blue)}
+    .alert.green{background:#eef6f2;border-color:#c4ddd2;color:#22503e}.alert.green b{color:var(--green)}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:18px}
+    .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 17px;box-shadow:var(--shadow)}
+    .kpi .lbl{color:var(--muted);font-size:11.5px}
+    .kpi .val{font-size:20px;font-weight:800;margin-top:8px}
+    .delta{font-size:11px;font-weight:800;border-radius:99px;padding:3px 9px;display:inline-block;margin-top:9px}
+    .delta.up{background:#e7f2ec;color:var(--green)}.delta.down{background:#faeae9;color:var(--red)}.delta.flat{background:#f0ece3;color:var(--muted)}
+    .kpi .hint{color:var(--muted);font-size:11px;margin-top:7px}
+    .kpi svg.spark{margin-top:8px;display:block}
+    .rgrid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:18px}
+    .chart-note{color:var(--muted);font-size:11px;margin-top:10px}
+    .hbar-row{display:grid;grid-template-columns:130px 1fr 110px;gap:10px;align-items:center;padding:7px 0;font-size:12.5px}
+    .hbar-track{background:#f0e9da;border-radius:99px;height:9px;overflow:hidden}
+    .hbar-fill{height:100%;border-radius:99px;background:var(--gold)}
+    .hbar-fill.blue{background:var(--blue)}.hbar-fill.green{background:var(--green)}
+    .hbar-val{color:var(--muted);font-size:11.5px;text-align:left;white-space:nowrap}
+    .legend{display:flex;flex-direction:column;gap:9px;font-size:12.5px}
+    .legend .li{display:flex;align-items:center;gap:9px}
+    .donut-wrap{display:flex;gap:26px;align-items:center;justify-content:center;flex-wrap:wrap}
+    .recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:13px}
+    .rec{background:#fcfaf5;border:1px solid var(--line);border-right:4px solid var(--gold);border-radius:11px;padding:14px 16px;font-size:12.5px;line-height:2}
+    .rec b{display:block;margin-bottom:3px}
+    .rec .num-chip{display:inline-block;background:var(--soft);border-radius:8px;padding:1px 8px;font-weight:800;color:var(--gold-dark)}
+    .badge.amber{background:#fff6df;color:#8a6a1d}
+    .editor-panel{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+    .ed-head{display:flex;flex-direction:column;gap:3px;margin-bottom:13px}
+    .ed-head b{font-size:13.5px}
+    .ed-head span{color:var(--muted);font-size:11.5px}
+    .n-group{margin-bottom:14px}
+    .n-group:last-child{margin-bottom:0}
+    .n-title{font-size:12.5px;font-weight:800;color:var(--gold-dark);margin-bottom:7px}
+    .n-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+    .n-bullet{color:var(--gold);font-size:9px;flex:0 0 auto}
+    .n-row input{flex:1;border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:var(--paper);font-size:12.5px;height:auto}
+    .n-row input:focus{outline:2px solid #c39a3d55}
+    .n-del{border:1px solid #ecc8c5;background:#fdf1f0;color:var(--red);border-radius:9px;padding:7px 12px;font-size:11.5px;font-weight:700}
+    .n-add{border:1px dashed var(--gold);background:var(--soft);color:var(--gold-dark);border-radius:9px;padding:7px 13px;font-size:12px;font-weight:700}
+    .rep-sheet{background:#fff;border:1px solid var(--line);border-radius:14px;padding:34px 38px;box-shadow:var(--shadow)}
+    .rep-sheet table{min-width:0}
+    .rep-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px double var(--gold-dark);padding-bottom:14px;margin-bottom:20px;gap:15px}
+    .rep-title{font-size:19px;font-weight:800;margin:0}
+    .rep-sub{color:var(--muted);font-size:12px;margin:6px 0 0}
+    .rep-sec{margin:0 0 22px}
+    .rep-sec h3{font-size:14px;color:var(--gold-dark);border-right:4px solid var(--gold);padding-right:10px;margin:0 0 12px}
+    .rep-kv{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+    .rep-kv>div{background:#faf8f3;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px}
+    .rep-kv b{display:block;font-size:14.5px;margin-top:5px}
+    .rep-sec ul{margin:0;padding-right:20px;line-height:2.2;font-size:12.5px}
+    .rep-sign{display:flex;justify-content:space-between;margin-top:34px;font-size:12.5px;color:var(--muted);gap:15px;flex-wrap:wrap}
+    @media(max-width:1050px){.kpis{grid-template-columns:repeat(2,1fr)}.rgrid{grid-template-columns:1fr}}
+    @media(max-width:760px){.kpis{grid-template-columns:1fr}.rep-kv{grid-template-columns:repeat(2,1fr)}.rep-sheet{padding:20px 16px}}
 
     .procedure-item{display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#fcfaf5;padding:12px;border-radius:10px;border:1px solid var(--line)}
     .procedure-item select{flex:2}
@@ -244,7 +310,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     .list-header h3 {margin:0;color:var(--gold-dark);font-size:18px}
     .custom-item-row {display:flex;align-items:center;gap:12px;padding:10px;background:#fcfaf5;border-radius:10px;margin-bottom:8px;border:1px solid #f0ece5}
 
-    @media(max-width:1050px){.stats,.report-cards{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}}@media(min-width:761px){.sidebar.open{transform:translateX(100%)}.sidebar.open~.main{margin-right:0}}@media(max-width:760px){.sidebar{transform:translateX(100%)}.sidebar.open{transform:none}.overlay{position:fixed;inset:0;z-index:19;background:#0007}.sidebar.open+.overlay{display:block}.main{margin-right:0}.topbar{padding:0 16px}.menu{display:grid}.status,.profile-copy{display:none}.content{padding:23px 16px 45px}.heading{align-items:stretch;flex-direction:column;gap:15px}.heading .primary{width:100%}.hero{padding:26px 22px}.form-grid,.detail-grid,.report-cards{grid-template-columns:1fr}.form-panel{padding:18px}.form-footer{align-items:stretch;flex-direction:column-reverse}.form-footer .button-row{width:100%}.form-footer button{flex:1}.toolbar{align-items:stretch;flex-direction:column}.toolbar input,.toolbar select{width:100%}}@media print{.sidebar,.topbar,.button-row,.toast,.toolbar,.heading .primary,.report-tabs{display:none!important}.main{margin:0}.content{padding:0}.panel,.stat,.report-card{border:0;box-shadow:none}}
+    @media(max-width:1050px){.stats,.report-cards{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}}@media(min-width:761px){.sidebar.open{transform:translateX(100%)}.sidebar.open~.main{margin-right:0}}@media(max-width:760px){.sidebar{transform:translateX(100%)}.sidebar.open{transform:none}.overlay{position:fixed;inset:0;z-index:19;background:#0007}.sidebar.open+.overlay{display:block}.main{margin-right:0}.topbar{padding:0 16px}.menu{display:grid}.status,.profile-copy{display:none}.content{padding:23px 16px 45px}.heading{align-items:stretch;flex-direction:column;gap:15px}.heading .primary{width:100%}.hero{padding:26px 22px}.form-grid,.detail-grid,.report-cards{grid-template-columns:1fr}.form-panel{padding:18px}.form-footer{align-items:stretch;flex-direction:column-reverse}.form-footer .button-row{width:100%}.form-footer button{flex:1}.toolbar{align-items:stretch;flex-direction:column}.toolbar input,.toolbar select{width:100%}}@media print{.sidebar,.topbar,.button-row,.toast,.toolbar,.heading .primary,.report-tabs,.report-toolbar,.period-line,.editor-panel,.alerts,.kpis,.print-hide{display:none!important}.main{margin:0}.content{padding:0}.panel,.stat,.report-card,.rep-sheet{border:0;box-shadow:none}.rep-sheet{padding:0}}
     /* ===== منطقة الطباعة الشاملة ===== */
     #printArea{display:none}
     #printArea{background:transparent;padding:0}
@@ -528,7 +594,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
   <script>
 
     "use strict";
-    const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", today=new Date().toISOString().slice(0,10);
+    const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", NARRATIVES_KEY="oras-dental-report-narratives-v1", today=new Date().toISOString().slice(0,10);
     const ARABIC_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
     const THEME_KEY="oras-dental-theme-v1";
     const MORNING_PASS_KEY="oras-dental-morning-pass-v1", EVENING_PASS_KEY="oras-dental-evening-pass-v1", MANAGER_PASS_KEY="oras-dental-manager-pass-v1";
@@ -579,7 +645,57 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     const ALLERGIES_LIST = ["لا يوجد", "أدوية", "بنج", "أطعمة"];
     const WOMEN_LIST = ["حامل", "مرضع", "لا"];
     const HABITS_LIST = ["تفريش", "خيط", "تدخين", "صرير", "لا شيء"];
-    const REFERRAL_LIST = ["صديق / أقارب", "إنستغرام", "فيسبوك", "إعلان ممول", "خرائط Google", "طبيب آخر", "مر بالصدفة", "لافتة خارجية"];
+    /* ===== قنوات معرفة العيادة: قائمة موحدة + تطبيع يمنع التكرار ===== */
+    const CHANNEL_CANON = ["فيسبوك", "إنستغرام", "تيك توك", "إعلان ممول", "خرائط Google", "واتساب", "لافتة خارجية", "صديق / أقارب", "مر بالصدفة", "طبيب آخر", "أخرى"];
+    const CHANNEL_ALIASES = [
+      ["فيسبوك", ["فيسبوك","فيس بوك","فيس book","فيسbook","facebook","face book","fb","الفيس بوك","الfacebook"]],
+      ["إنستغرام", ["إنستغرام","انستغرام","انستا","إنستا","instagram","insta","الانستغرام"]],
+      ["تيك توك", ["تيك توك","تيك تك","تيكتوك","tiktok","tik tok"]],
+      ["إعلان ممول", ["إعلان ممول","اعلان ممول","إعلان","اعلان","ممول","إعلانات ممولة","sponsored","sponsored ads"]],
+      ["خرائط Google", ["خرائط google","خرائط جوجل","خرائط","google","google maps","google map","جوجل ماب"]],
+      ["واتساب", ["واتساب","واتس أب","whatsapp","واتس"]],
+      ["لافتة خارجية", ["لافتة خارجية","لافتة","اللافتة","لوحة خارجية","billboard"]],
+      ["صديق / أقارب", ["صديق / أقارب","صديق","صديق/أقارب","أقارب","توصية صديق","ينصح بصديق"]],
+      ["مر بالصدفة", ["مر بالصدفة","صدفة","مرور بالصدفة"]],
+      ["طبيب آخر", ["طبيب آخر","طبيب","عيادة أخرى","إحالة طبيب"]],
+      ["أخرى", ["أخرى","اخري","other"]]
+    ];
+    function normChannel(v){
+      const s = String(v||"").trim().replace(/\s+/g," ").replace(/[\u064B-\u0652\u0640]/g,"").toLowerCase();
+      if(!s) return "";
+      for(const [canon, aliases] of CHANNEL_ALIASES){
+        if(aliases.some(a=>a.toLowerCase()===s)) return canon;
+      }
+      return String(v).trim();
+    }
+    function dedupeChannels(arr){
+      const seen=new Set(); const out=[];
+      (arr||[]).forEach(x=>{const k=normChannel(x); if(k && !seen.has(k)){seen.add(k); out.push(k);}});
+      return out;
+    }
+    function mergeChannels(list){
+      const m={};
+      (list||[]).forEach(c=>{const k=normChannel(c&&c.label)||"غير محدد"; m[k]=(m[k]||0)+Number(c&&c.count||0);});
+      return Object.keys(m).map(k=>({label:k,count:m[k]})).sort((a,b)=>b.count-a.count);
+    }
+    function defaultChannelRows(){ return CHANNEL_CANON.map(c=>({label:c,count:0})); }
+    function migrateChannelData(){
+      let changed=false;
+      patients.forEach(p=>{
+        const refs=Array.isArray(p.referral)?p.referral:(p.referral?[p.referral]:[]);
+        const dd=dedupeChannels(refs);
+        if(JSON.stringify(dd)!==JSON.stringify(refs)){p.referral=dd;changed=true;}
+      });
+      monthlyReports.forEach(r=>{
+        if(Array.isArray(r.channels)){
+          const before=JSON.stringify(r.channels);
+          r.channels=mergeChannels(r.channels);
+          if(JSON.stringify(r.channels)!==before)changed=true;
+        }
+      });
+      if(changed)saveLocal();
+    }
+    const REFERRAL_LIST = CHANNEL_CANON;
     const TIME_LIST = ["صباح", "مساء", "نهاية الأسبوع"];
     const REASON_LIST = ["السعر", "السمعة", "القرب", "سرعة الخدمة", "الطبيب", "التصميم / النظافة"];
     const SERVICE_LIST = ["علاجي (ألم)", "تجميلي", "وقائي", "طارئ"];
@@ -593,10 +709,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         labs=load(LABS_KEY,seedLabs),
         monthlyReports=load(MONTHLY_KEY,[]);
 
+        migrateChannelData();
+
     let theme=localStorage.getItem(THEME_KEY)||"default";
     let currentRole=null, selectedLoginRole=null;
 
-    let view="dashboard", selectedPatientId=null, editingPatientId=null, editingVisitId=null, toastTimer, adminUnlocked=false, activeReportTab = "comprehensive";
+    let view="dashboard", selectedPatientId=null, editingPatientId=null, editingVisitId=null, toastTimer, adminUnlocked=false, activeReportTab = "dash";
+    let reportPeriod="month", reportCustom={from:"",to:""}, reportCompare=true;
+    let narratives=(function(){try{const v=JSON.parse(localStorage.getItem(NARRATIVES_KEY)||"{}");return (v&&typeof v==="object"&&!Array.isArray(v))?v:{}}catch(e){return{}}})();
     let monthlySubView="list", selectedMonthlyId=null, monthlyDraft=null;
 
     function load(key,fallback){try{const saved=JSON.parse(localStorage.getItem(key));return Array.isArray(saved)?saved:fallback}catch(e){return fallback}}
@@ -1573,224 +1693,377 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       return `<section class="view"><div class="heading"><div><p class="eyebrow">صلاحيات محدودة</p><h1>${title}</h1><p class="sub">${desc}</p></div></div><div class="panel" style="padding:40px;text-align:center"><p style="font-size:16px;color:var(--muted)">يرجى تسجيل الدخول بحساب المدير للوصول لهذه الصفحة.</p><button class="primary" data-action="admin" style="margin-top:15px">تسجيل دخول المدير</button></div></section>`;
     }
 
-    function reportFiltered(){
-      return getVisibleVisits();
+    /* ==================================================================
+       محرك التقارير الجديد — كل الأرقام محسوبة من سجلات النظام الفعلية
+       (الزيارات، المصاريف، المخزون، طلبات المعامل، المرضى وقنواتهم)
+    ================================================================== */
+    const REPORT_PERIODS=[["today","اليوم"],["yesterday","أمس"],["week","آخر 7 أيام"],["month","هذا الشهر"],["lastmonth","الشهر الماضي"],["30d","آخر 30 يوم"],["custom","فترة مخصصة"]];
+    const NARR_TABS=[["achievements","⭐ أهم الإنجازات خلال الفترة"],["challenges","⚠️ أبرز التحديات"],["marketing","📣 الأنشطة التسويقية"],["nextTasks","🗓 مهام وخطة الفترة القادمة"]];
+    const DEFAULT_NARRATIVE={achievements:["سير العمل بالعيادة بانتظام دون توقف طوال الفترة","تحسّن معدل التحصيل النقدي مقارنة بالفترة السابقة"],challenges:["تأخر بعض المرضى في سداد المتبقيات"],marketing:["نشر حالات علاجية على صفحات العيادة"],nextTasks:["متابعة تحصيل الديون المستحقة بدءاً بالأقدم"]};
+
+    function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+    function fmtDay(d){return d.getDate()+" "+ARABIC_MONTHS[d.getMonth()]+" "+d.getFullYear()}
+    function pctDelta(cur,prv){return prv>0?((cur-prv)/prv*100):(cur>0?100:0)}
+
+    function reportRange(){
+      const t=new Date();t.setHours(0,0,0,0);
+      const s=new Date(t),e=new Date(t);
+      if(reportPeriod==="yesterday"){s.setDate(s.getDate()-1);e.setDate(e.getDate()-1)}
+      else if(reportPeriod==="week"){s.setDate(s.getDate()-6)}
+      else if(reportPeriod==="month"){s.setDate(1)}
+      else if(reportPeriod==="lastmonth"){s.setMonth(s.getMonth()-1);s.setDate(1);e.setMonth(e.getMonth());e.setDate(0)}
+      else if(reportPeriod==="30d"){s.setDate(s.getDate()-29)}
+      else if(reportPeriod==="custom"){
+        const f=reportCustom.from?new Date(reportCustom.from+"T00:00:00"):null;
+        const tt=reportCustom.to?new Date(reportCustom.to+"T00:00:00"):null;
+        if(f)s.setTime(f.getTime());
+        if(tt)e.setTime(tt.getTime());
+        if(s>e){const tmp=new Date(s);s.setTime(e.getTime());e.setTime(tmp.getTime())}
+      }
+      return[s,e];
+    }
+    function prevRangeOf(s,e){const len=Math.round((e-s)/86400000)+1;const pe=new Date(s);pe.setDate(pe.getDate()-1);const ps=new Date(pe);ps.setDate(ps.getDate()-(len-1));return[ps,pe]}
+
+    function computeRange(sd,ed){
+      const a=ymd(sd),b=ymd(ed);
+      const vs=getVisibleVisits().filter(v=>(v.date||"")>=a&&(v.date||"")<=b);
+      const done=vs.filter(v=>v.status!=="ملغاة");
+      const expList=expenses.filter(x=>(x.date||"")>=a&&(x.date||"")<=b);
+      const labList=labs.filter(l=>(l.date||"")>=a&&(l.date||"")<=b);
+      const rev=done.reduce((s,v)=>s+Number(v.cost||0),0);
+      const paid=done.reduce((s,v)=>s+Number(v.paid||0),0);
+      const due=done.reduce((s,v)=>s+Number(v.due||0),0);
+      const exp=expList.reduce((s,x)=>s+Number(x.amount||0),0);
+      const labCost=labList.reduce((s,l)=>s+Number(l.cost||0),0);
+      const days=Math.max(1,Math.round((ed-sd)/86400000)+1);
+      const svc={},doc={},chair={},shift={},daily={},debtors={};
+      done.forEach(v=>{
+        const items=(Array.isArray(v.items)&&v.items.length)?v.items:[{procedure:v.procedure||v.treatment||"علاج",cost:v.cost}];
+        items.forEach(it=>{if(!it.procedure)return;svc[it.procedure]=svc[it.procedure]||{n:0,total:0};svc[it.procedure].n++;svc[it.procedure].total+=Number(it.cost||0)});
+        const dv=v.doctor||"غير محدد";doc[dv]=doc[dv]||{n:0,total:0};doc[dv].n++;doc[dv].total+=Number(v.cost||0);
+        const cv=v.chair||"كرسي 1";chair[cv]=(chair[cv]||0)+1;
+        const sv=v.shift||"غير محدد";shift[sv]=(shift[sv]||0)+1;
+        daily[v.date]=(daily[v.date]||0)+Number(v.paid||0);
+        const dd=Number(v.due||0);
+        if(dd>0){const nm=v.patientName||"غير محدد";debtors[nm]=debtors[nm]||{amt:0,n:0,oldest:v.date};debtors[nm].amt+=dd;debtors[nm].n++;if(v.date<debtors[nm].oldest)debtors[nm].oldest=v.date}
+      });
+      // قنوات المعرفة: من بيانات المرضى المرتبطين بزيارات الفترة (تطبيع + بلا تكرار)
+      const pidSet=new Set(done.map(v=>v.patientId||v.patientName));
+      const src={};
+      pidSet.forEach(id=>{const p=getPatient(id);const refs=Array.isArray(p&&p.referral)?p.referral:(p&&p.referral?[p.referral]:["غير محدد"]);dedupeChannels(refs.length?refs:["غير محدد"]).forEach(r=>{src[r]=(src[r]||0)+1})});
+      const newP=done.filter(v=>v.visitType==="جديد").length;
+      const rep=done.filter(v=>v.visitType!=="جديد").length;
+      const cancels=vs.filter(v=>v.status==="ملغاة").length;
+      const expByCat={};expList.forEach(x=>{const k=x.category||"أخرى";expByCat[k]=(expByCat[k]||0)+Number(x.amount||0)});
+      return{vs,done,rev,paid,due,exp,expByCat,labList,labCost,days,svc,doc,chair,shift,daily,debtors,src,newP,rep,cancels,net:paid-exp,avgInvoice:done.length?rev/done.length:0,cancelRate:vs.length?cancels/vs.length*100:0,visitsPerDay:vs.length/days};
     }
 
-    function reportsPage(){
-      if(!adminUnlocked) return lockedPage("التقرير الشامل والأداء","بيانات التقرير الإداري والمالي والتشغيلي متاحة للمدير فقط.");
-      const filtered=reportFiltered();
-      const totalRev=filtered.reduce((s,v)=>s+Number(v.cost||0),0);
-      const totalPaid=filtered.reduce((s,v)=>s+Number(v.paid||0),0);
-      const totalDue=filtered.reduce((s,v)=>s+Number(v.due||0),0);
-      const totalExp=expenses.reduce((s,e)=>s+Number(e.amount||0),0);
-      const netProfit=totalPaid - totalExp;
+    /* ===== مكوّنات الرسم (SVG/DOM خالص — بلا مكتبات خارجية) ===== */
+    function sparkline(pts,w,h,color){
+      w=w||110;h=h||30;color=color||"#c39a3d";
+      if(!pts.length)return"";
+      const mx=Math.max(...pts,1),mn=Math.min(...pts,0),rg=(mx-mn)||1;
+      const xy=pts.map((p,i)=>[(i/(pts.length-1||1))*(w-4)+2,h-2-((p-mn)/rg)*(h-6)]);
+      const line=xy.map(p=>p.join(",")).join(" ");
+      const last=xy[xy.length-1];
+      return`<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2.8" fill="${color}"/></svg>`;
+    }
+    function chartBars(dates,vals){
+      if(!vals.length||!vals.some(v=>v>0))return`<div class="empty">لا توجد تحصيل مسجل بالفترة المحددة.</div>`;
+      const W=760,H=210,pad={t:14,b:26,l:8,r:8},iw=(W-pad.l-pad.r)/vals.length,mx=Math.max(...vals,1);
+      const bars=vals.map((v,i)=>{const h=(v/mx)*(H-pad.t-pad.b),x=pad.l+i*iw+iw*0.16,y=H-pad.b-h,bw=iw*0.68;
+        return`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(h,1).toFixed(1)}" rx="3" fill="${i===vals.length-1?'#c39a3d':'#e3d3a8'}"><title>${dates[i]}: ${money(v)}</title></rect>`}).join("");
+      const avg=vals.reduce((s,v)=>s+v,0)/vals.length,ay=H-pad.b-(avg/mx)*(H-pad.t-pad.b);
+      const labels=dates.map((d,i)=>{if(vals.length>14&&i%Math.ceil(vals.length/8)!==0&&i!==vals.length-1)return"";const dd=new Date(d+"T00:00:00");return`<text x="${(pad.l+i*iw+iw/2).toFixed(1)}" y="${H-8}" font-size="9" fill="#766f65" text-anchor="middle">${dd.getDate()}/${dd.getMonth()+1}</text>`}).join("");
+      return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;direction:ltr">${bars}<line x1="${pad.l}" x2="${W-pad.r}" y1="${ay.toFixed(1)}" y2="${ay.toFixed(1)}" stroke="#ae4740" stroke-dasharray="5 4" stroke-width="1.4"/><text x="${W-pad.r}" y="${(ay-5).toFixed(1)}" font-size="10" fill="#ae4740">متوسط: ${Math.round(avg).toLocaleString("ar-SD")}</text>${labels}</svg>`;
+    }
+    function hbarsRow(items,color){
+      if(!items.length)return`<div class="empty">لا توجد بيانات.</div>`;
+      const mx=Math.max(...items.map(i=>i[1]),1);
+      return items.map(i=>`<div class="hbar-row"><span title="${esc(i[0])}">${esc(i[0].length>18?i[0].slice(0,17)+"…":i[0])}</span><div class="hbar-track"><div class="hbar-fill ${color||''}" style="width:${Math.max(3,i[1]/mx*100).toFixed(1)}%"></div></div><span class="hbar-val">${i[2]}</span></div>`).join("");
+    }
+    function donutChart(items){
+      if(!items.length)return`<div class="empty">لا توجد بيانات.</div>`;
+      const tot=items.reduce((s,i)=>s+i[1],0)||1;
+      const colors=["#c39a3d","#396c91","#2d7658","#ae4740","#8a6a1d","#7f5d1a","#b0a489","#5c7f9e","#9c6f9e","#6b8f71"];
+      let acc=0;
+      const c=items.map((i,ix)=>{const pct=i[1]/tot*100,dash=Math.max(0,pct-0.4),off=25-acc;acc+=pct;
+        return`<circle r="15.915" cx="21" cy="21" fill="none" stroke="${colors[ix%colors.length]}" stroke-width="10" stroke-dasharray="${dash.toFixed(2)} ${(100-dash).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"><title>${esc(i[0])}: ${i[1]} (${Math.round(pct)}%)</title></circle>`}).join("");
+      const legend=items.map((i,ix)=>`<div class="li"><span class="dot" style="background:${colors[ix%colors.length]}"></span>${esc(i[0])}<b style="margin-inline-start:auto">${Math.round(i[1]/tot*100)}%</b></div>`).join("");
+      return`<div class="donut-wrap"><svg viewBox="0 0 42 42" width="150" height="150">${c}<text x="21" y="20" text-anchor="middle" font-size="6.5" font-weight="800" fill="#1d1d1b">${tot}</text><text x="21" y="26.5" text-anchor="middle" font-size="3" fill="#766f65">إجمالي</text></svg><div class="legend" style="min-width:180px;flex:1">${legend}</div></div>`;
+    }
 
+    /* ===== بطاقات المؤشرات والتنبيهات ===== */
+    function kpiCard(lbl,val,hint,dVal,spark){
+      let d="";
+      if(dVal!==null&&dVal!==undefined){
+        const cls=dVal>1?"up":dVal<-1?"down":"flat";
+        const arrow=dVal>1?"▲":dVal<-1?"▼":"◆";
+        d=`<span class="delta ${cls}">${arrow} ${Math.abs(Math.round(dVal))}% عن الفترة السابقة</span>`;
+      }
+      return`<div class="kpi"><div class="lbl">${lbl}</div><div class="val">${val}</div>${d}${spark||""}<div class="hint">${hint}</div></div>`;
+    }
+    function alertCard(cls,icon,title,text){return`<div class="alert ${cls}"><b>${icon} ${title}</b>${text}</div>`}
+
+    /* ===== توصيات محسوبة من بيانات الفترة (مشتركة: اللوحة + التقرير المطبوع) ===== */
+    function buildReportRecs(c){
+      const recs=[];
+      const svcRows=Object.entries(c.svc).map(([n,d])=>({name:n,count:d.n,total:d.total})).sort((a,b)=>b.total-a.total);
+      const lowItems=inventory.filter(i=>Number(i.qty)<=Number(i.minQty));
+      if(c.paid>0&&c.due>c.paid*0.15)recs.push(["🔐 أولوية التحصيل",`الديون (${money(c.due)}) تمثل <span class="num-chip">${Math.round(c.due/c.paid*100)}%</span> من المحصّل. خصّص وقتاً أسبوعياً للتحصيل وابدأ بأكبر المدينين (موضحون في اللوحة).`]);
+      if(c.cancelRate>8)recs.push(["📞 تقليل الإلغاءات",`نسبة الإلغاء <span class="num-chip">${Math.round(c.cancelRate)}%</span> (${c.cancels} موعد). تأكيد المواعيد قبل 24 ساعة يخفضها عادة للنصف.`]);
+      if(svcRows[0]&&c.rev>0)recs.push(["⭐ عزّز خدمتك الأكثر ربحية",`«${esc(svcRows[0].name)}» حقق <span class="num-chip">${money(svcRows[0].total)}</span> (${Math.round(svcRows[0].total/c.rev*100)}% من الإيراد). خصّص لها طاقة أكبر وروّج لها.`]);
+      if(lowItems.length)recs.push(["📦 طلب مخزون عاجل",`<span class="num-chip">${lowItems.length}</span> أصناف وصلت حد الأمان: ${lowItems.map(i=>esc(i.name)).join("، ")}.`]);
+      if(c.labList.length)recs.push(["🦷 متابعة طلبات المعامل",`<span class="num-chip">${c.labList.length}</span> طلب معمل بالفترة بتكلفة ${money(c.labCost)}${c.labList.filter(l=>l.status==="قيد التصنيع").length?" — منهم "+c.labList.filter(l=>l.status==="قيد التصنيع").length+" قيد التصنيع، تابع الاستلام مع المعمل.":""}`]);
+      const topDoc=Object.entries(c.doc).sort((a,b)=>b[1].total-a[1].total)[0];
+      if(topDoc&&Object.keys(c.doc).length>1)recs.push(["🩺 توزيع الأطباء",`الأعلى إيراداً: <b>${esc(topDoc[0])}</b> بمبلغ <span class="num-chip">${money(topDoc[1].total)}</span> عبر ${topDoc[1].n} حالة. راجع توازن الحجوزات بين الأطباء.`]);
+      const topSrc=Object.entries(c.src).sort((a,b)=>b[1]-a[1])[0];
+      if(topSrc)recs.push(["🎯 مصدر النمو",`أقوى قناة استقطاب بالفترة: <b>${esc(topSrc[0])}</b> بـ ${topSrc[1]} مريض. اربط مصاريف التسويق بالقنوات الفعالة.`]);
+      return recs;
+    }
+
+    /* ===== تبويب لوحة القرار التفاعلية ===== */
+    function renderDashReport(cur,prev){
+      const dd=(v,p)=>prev?pctDelta(v,p):null;
+      const lowItems=inventory.filter(i=>Number(i.qty)<=Number(i.minQty));
+
+      // شريط التنبيهات الذكية
+      const alerts=[];
+      if(cur.due>0){const top=Object.entries(cur.debtors).sort((a,b)=>b[1].amt-a[1].amt)[0];
+        alerts.push(alertCard("red","💸","ديون تحتاج تحصيل",`<b>${money(cur.due)}</b> متبقية عند <b>${Object.keys(cur.debtors).length}</b> مريض.${top?` أكبر مدين: <b>${esc(top[0])}</b> بمبلغ <b>${money(top[1].amt)}</b>.`:""}`))}
+      if(lowItems.length)alerts.push(alertCard("amber","📦","مواد تحت حد الأمان",`${lowItems.length} أصناف: <b>${lowItems.slice(0,4).map(i=>esc(i.name)).join("، ")}</b>${lowItems.length>4?" وغيرها":""}. راجع لوحة المخزون بالأسفل.`));
+      if(prev&&prev.rev>0){const d=pctDelta(cur.rev,prev.rev);if(d<-10)alerts.push(alertCard("red","📉","تراجع في الإيرادات",`الإيرادات انخفضت <b>${Math.abs(Math.round(d))}%</b> مقارنة بالفترة السابقة (${money(prev.rev)} ← ${money(cur.rev)}).`))}
+      if(cur.vs.length&&cur.cancelRate>8)alerts.push(alertCard("amber","❌","نسبة إلغاء مرتفعة",`<b>${Math.round(cur.cancelRate)}%</b> من المواعيد أُلغيت (${cur.cancels} موعد). يُقترح تفعيل تأكيد المواعيد قبلها بيوم.`));
+      const pendingLabs=cur.labList.filter(l=>l.status==="قيد التصنيع").length;
+      if(pendingLabs)alerts.push(alertCard("blue","🦷","طلبات معامل قيد التنفيذ",`<b>${pendingLabs}</b> تركيبات لم تُستلم بعد من المعامل — تابع مواعيد الاستلام لتجنب تعطيل خطط العلاج.`));
+      if(cur.net>=0)alerts.push(alertCard("green","✅","الوضع المالي",`صافي <b>${money(cur.net)}</b> بعد خصم مصاريف الفترة <b>${money(cur.exp)}</b> من محصّل <b>${money(cur.paid)}</b>.`));
+      else alerts.push(alertCard("red","⚠️","عجز نقدي بالفترة",`المصاريف (<b>${money(cur.exp)}</b>) تجاوزت المحصّل (<b>${money(cur.paid)}</b>) بمقدار <b>${money(-cur.net)}</b>.`));
+      const bestDay=Object.entries(cur.daily).sort((a,b)=>b[1]-a[1])[0];
+      if(bestDay)alerts.push(alertCard("blue","🗓","أفضل يوم بالفترة",`<b>${fmtDay(new Date(bestDay[0]+"T00:00:00"))}</b> حقق أعلى تحصيل (<b>${money(bestDay[1])}</b>) — استفد من توزيع المواعيد المشابه.`));
+
+      // شرارات آخر 14 يوماً (من كل الزيارات المرئية)
+      const days14=getVisibleVisits().filter(v=>v.date>=ymd(new Date(Date.now()-13*86400000)));
+      const sparkDaily=key=>{const byDate={};days14.forEach(v=>{if(v.status!=="ملغاة")byDate[v.date]=(byDate[v.date]||0)+Number(v[key]||0)});const pts=Array.from({length:14},(_,i)=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-13+i);return byDate[ymd(d)]||0});return sparkline(pts)};
+
+      const svcRows=Object.entries(cur.svc).map(([n,d])=>({name:n,count:d.n,total:d.total})).sort((a,b)=>b.total-a.total);
+      const recs=buildReportRecs(cur);
+      const dailyDates=Object.keys(cur.daily).sort();
+      const debtorsRows=Object.entries(cur.debtors).sort((a,b)=>b[1].amt-a[1].amt).slice(0,6).map(([n,d])=>{
+        const age=Math.round((Date.now()-new Date(d.oldest+"T00:00:00"))/86400000);
+        const badge=age>45?'<span class="badge red">':age>21?'<span class="badge amber">':'<span class="badge green">';
+        return`<tr><td><strong>${esc(n)}</strong></td><td class="num" style="color:var(--red)">${money(d.amt)}</td><td>${d.n} فواتير</td><td>${badge}${age} يوم</span></td></tr>`}).join("");
+      const chairNote=Object.entries(cur.chair).map(([k,n])=>`${esc(k)}: ${n} زيارة (${Math.round(n/(cur.done.length||1)*100)}%)`).join(" • ");
+      const shiftNote=Object.entries(cur.shift).map(([k,n])=>`${esc(k)}: ${n}`).join(" • ");
+
+      return`
+      <div class="alerts">${alerts.join("")}</div>
+
+      <div class="kpis">
+        ${kpiCard("إجمالي الإيراد (قيمة الخدمات)",money(cur.rev),"قيمة ما نُفّذ بالفترة",prev?dd(cur.rev,prev.rev):null,sparkDaily("cost"))}
+        ${kpiCard("المحصّل فعلياً",money(cur.paid),"نقد وارد في الخزنة",prev?dd(cur.paid,prev.paid):null,sparkDaily("paid"))}
+        ${kpiCard("ديون جديدة بالفترة",money(cur.due),"مبالغ تأجلت للمرضى",prev?dd(cur.due,prev.due):null)}
+        ${kpiCard("صافي (المحصّل − المصاريف)",money(cur.net),"مصاريف الفترة: "+money(cur.exp),prev?dd(cur.net,prev.net):null)}
+        ${kpiCard("عدد الزيارات",cur.vs.length+" زيارة",Math.round(cur.visitsPerDay*10)/10+" زيارة/يوم",prev?dd(cur.vs.length,prev.vs.length):null)}
+        ${kpiCard("مرضى جدد / متابعون",cur.newP+" / "+cur.rep,"نسبة استبقاء "+(cur.newP+cur.rep?Math.round(cur.rep/(cur.newP+cur.rep)*100):0)+"%",prev?dd(cur.newP+cur.rep,prev.newP+prev.rep):null)}
+        ${kpiCard("متوسط قيمة الفاتورة",money(cur.avgInvoice),"الإيراد ÷ عدد الزيارات",prev?dd(cur.avgInvoice,prev.avgInvoice):null)}
+        ${kpiCard("نسبة إلغاء المواعيد",Math.round(cur.cancelRate)+"%",cur.cancels+" موعد ملغى",prev?dd(cur.cancelRate,prev.cancelRate||1):null)}
+      </div>
+
+      <div class="rgrid">
+        <section class="panel"><div class="panel-head"><div><h2>📈 التحصيل اليومي خلال الفترة</h2><p>كل عمود = تحصيل يوم. الخط المتقطع = متوسط الفترة. مرّر الفأرة على العمود للتفاصيل.</p></div></div>
+          <div class="panel-body" style="padding:18px 20px">${chartBars(dailyDates,dailyDates.map(d=>cur.daily[d]))}</div></section>
+        <section class="panel"><div class="panel-head"><div><h2>🎯 من أين يأتي مرضاك؟</h2><p>قنوات معرفة العيادة لمرضى الفترة (مطابَقة بأسمائها الموحدة، بلا تكرار).</p></div></div>
+          <div class="panel-body" style="padding:18px 20px">${donutChart(Object.entries(cur.src).sort((a,b)=>b[1]-a[1]))}</div></section>
+      </div>
+
+      <div class="rgrid">
+        <section class="panel"><div class="panel-head"><div><h2>🦷 أعلى الخدمات إيراداً</h2><p>أين تذهب طاقة العيادة؟ رتّب جهودك على الأكثر ربحية.</p></div></div>
+          <div class="panel-body" style="padding:14px 20px">${svcRows.length?hbarsRow(svcRows.slice(0,8).map(r=>[r.name,r.total,money(r.total)+" / "+r.count+" مرة"]))+`${svcRows.length>8?`<p class="chart-note">يتبقى ${svcRows.length-8} خدمة أخرى — التفاصيل الكاملة في تصدير Excel.</p>`:""}`:`<div class="empty">لا توجد خدمات منفذة بالفترة.</div>`}</div></section>
+        <section class="panel"><div class="panel-head"><div><h2>💸 أكبر المدينين (أولوية التحصيل)</h2><p>مرتّبون بالمبلغ + عمر الدين — ابدأ بالأقدم والأكبر.</p></div></div>
+          <div class="panel-body" style="padding-top:6px">${debtorsRows?`<div class="table-wrap"><table><thead><tr><th>المريض</th><th>المتبقي</th><th>الفواتير</th><th>عمر الدين</th></tr></thead><tbody>${debtorsRows}</tbody></table></div>`:`<div class="empty">لا ديون في هذه الفترة 🎉</div>`}</div></section>
+      </div>
+
+      <section class="panel"><div class="panel-head"><div><h2>🧭 التوصيات — محسوبة من أرقام هذه الفترة بالذات</h2><p>لا نصوص ثابتة: كل توصية تتغير تلقائياً حسب بيانات العيادة</p></div></div>
+        <div class="panel-body"><div class="recs">${recs.map(r=>`<div class="rec"><b>${r[0]}</b>${r[1]}</div>`).join("")||`<div class="empty">لا توصيات حالياً — سجّل زيارات لتظهر التوصيات.</div>`}</div></div></section>
+
+      <div class="rgrid">
+        <section class="panel"><div class="panel-head"><div><h2>📦 المخزون تحت حد الأمان</h2><p>أصناف يجب طلبها لتجنّب توقف العمل</p></div></div>
+          <div class="panel-body" style="padding:14px 20px">${lowItems.length?hbarsRow(lowItems.map(i=>[i.name+" ("+i.qty+" "+(i.unit||"")+")",Math.min(100,Number(i.qty)/Math.max(1,Number(i.minQty))*100),Math.round(Number(i.qty)/Math.max(1,Number(i.minQty))*100)+"% من حد الأمان"]),"green"):`<div class="empty">المخزون بحالة جيدة — لا نواقص.</div>`}</div></section>
+        <section class="panel"><div class="panel-head"><div><h2>👥 الأطباء والكراسي والمعامل</h2><p>توزيع الحالات والإيراد حسب سجلات الفترة</p></div></div>
+          <div class="panel-body" style="padding:14px 20px">
+            ${hbarsRow(Object.entries(cur.doc).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>[n,d.total,money(d.total)+" / "+d.n+" حالة"]))}
+            <p class="chart-note" style="margin-top:14px">الكراسي: ${chairNote||"—"}</p>
+            <p class="chart-note">الشيفتات: ${shiftNote||"—"}</p>
+            <p class="chart-note">طلبات المعامل بالفترة: <b>${cur.labList.length}</b> بتكلفة <b>${money(cur.labCost)}</b>${pendingLabs?" ("+pendingLabs+" قيد التصنيع)":""}</p>
+          </div></section>
+      </div>`;
+    }
+
+    /* ===== خانات السرد اليدوي (تُحفظ تلقائياً لكل فترة) ===== */
+    function narrKey(){const[s,e]=reportRange();return ymd(s)+"_"+ymd(e)}
+    function getNarr(){if(!narratives[narrKey()])narratives[narrKey()]=JSON.parse(JSON.stringify(DEFAULT_NARRATIVE));return narratives[narrKey()]}
+    function persistNarr(){try{localStorage.setItem(NARRATIVES_KEY,JSON.stringify(narratives))}catch(e){}}
+    function bullets(list){const items=(list||[]).map(x=>String(x||"").trim()).filter(Boolean);return items.length?items.map(x=>`<li>${esc(x)}</li>`).join(""):`<li style="color:var(--muted);list-style:none;margin-right:-20px">لا نقاط مسجلة</li>`}
+    function nRow(key,i,v){return`<div class="n-row"><span class="n-bullet">◆</span><input value="${esc(v)}" placeholder="اكتب نقطة..." oninput="updNarr('${key}',${i},this.value)"><button type="button" class="n-del" onclick="delNarr('${key}',${i})">حذف</button></div>`}
+    function narrEditor(key,title){const n=getNarr();return`<div class="n-group"><div class="n-title">${title}</div><div id="nlist-${key}">${n[key].map((v,i)=>nRow(key,i,v)).join("")}</div><button type="button" class="n-add" onclick="addNarr('${key}')">＋ إضافة نقطة</button></div>`}
+    function updNarr(key,i,val){const n=getNarr();n[key][i]=val;persistNarr();const el=document.getElementById("sheet-"+key);if(el)el.innerHTML=bullets(n[key])}
+    function addNarr(key){const n=getNarr();n[key].push("");persistNarr();const list=document.getElementById("nlist-"+key);if(!list)return;list.insertAdjacentHTML("beforeend",nRow(key,n[key].length-1,""));const inputs=list.querySelectorAll("input");if(inputs.length)inputs[inputs.length-1].focus()}
+    function delNarr(key,i){const n=getNarr();n[key].splice(i,1);persistNarr();const list=document.getElementById("nlist-"+key);if(list)list.innerHTML=n[key].map((v,ix)=>nRow(key,ix,v)).join("");const el=document.getElementById("sheet-"+key);if(el)el.innerHTML=bullets(n[key])}
+
+    /* ===== تبويب التقرير الرسمي للطباعة ===== */
+    function renderPrintReport(){
+      const[s,e]=reportRange();
+      const c=computeRange(s,e);
+      const svc=Object.entries(c.svc).map(([n,d])=>({name:n,count:d.n,total:d.total})).sort((a,b)=>b.total-a.total);
+      const expRows=Object.entries(c.expByCat).sort((a,b)=>b[1]-a[1]);
+      const srcTotal=Object.values(c.src).reduce((s,v)=>s+v,0)||1;
+      const recs=buildReportRecs(c);
+      const n=getNarr();
+      return`
+      <div class="editor-panel print-hide">
+        <div class="ed-head"><b>✏️ خانات السرد اليدوي للتقرير</b><span>نفس بنود التقرير الشهري الرسمي (أهم الإنجازات، التحديات، التسويق، مهام الفترة القادمة) — عدّل النقاط وستظهر فوراً في التقرير أدناه، وتُحفظ تلقائياً لكل فترة، وتُطبع مع التقرير</span></div>
+        ${NARR_TABS.map(m=>narrEditor(m[0],m[1])).join("")}
+      </div>
+      <div class="rep-sheet">
+        <div class="rep-head">
+          <div><p class="rep-title">عيادة أوراس لطب الأسنان</p><p class="rep-sub">تقرير أداء الفترة من <b>${fmtDay(s)}</b> إلى <b>${fmtDay(e)}</b> — يُولَّد تلقائياً من سجلات النظام</p></div>
+          <div style="text-align:left;font-size:11.5px;color:var(--muted)">رقم التقرير: أ-${ymd(s).replace(/-/g,"")}<br>تاريخ الإصدار: ${fmtDay(new Date())}</div>
+        </div>
+        <div class="rep-sec"><h3>١. الملخص التنفيذي</h3>
+          <div class="rep-kv">
+            <div>إجمالي الإيراد<b>${money(c.rev)}</b></div>
+            <div>المحصّل فعلياً<b>${money(c.paid)}</b></div>
+            <div>إجمالي المصاريف<b>${money(c.exp)}</b></div>
+            <div>صافي الفترة<b style="color:${c.net>=0?"var(--green)":"var(--red)"}">${money(c.net)}</b></div>
+            <div>عدد الزيارات<b>${c.vs.length}</b></div>
+            <div>مرضى جدد<b>${c.newP}</b></div>
+            <div>ديون جديدة بالفترة<b>${money(c.due)}</b></div>
+            <div>متوسط الفاتورة<b>${money(c.avgInvoice)}</b></div>
+          </div>
+          <ul>
+            <li>متوسط الإنتاج اليومي: <b>${Math.round(c.visitsPerDay*10)/10}</b> زيارة/يوم على مدى ${c.days} يوم.</li>
+            <li>نسبة إلغاء المواعيد: <b>${Math.round(c.cancelRate)}%</b> (${c.cancels} موعد من أصل ${c.vs.length}).</li>
+            <li>نسبة الاستبقاء (متابعون ÷ إجمالي): <b>${Math.round(c.rep/((c.newP+c.rep)||1)*100)}%</b>.</li>
+            <li>طلبات المعامل بالفترة: <b>${c.labList.length}</b> بتكلفة <b>${money(c.labCost)}</b>.</li>
+          </ul>
+        </div>
+        <div class="rep-sec"><h3>٢. ${NARR_TABS[0][1].substring(2)}</h3><ul id="sheet-achievements">${bullets(n.achievements)}</ul></div>
+        <div class="rep-sec"><h3>٣. ${NARR_TABS[1][1].substring(2)}</h3><ul id="sheet-challenges">${bullets(n.challenges)}</ul></div>
+        <div class="rep-sec"><h3>٤. ${NARR_TABS[2][1].substring(2)}</h3><ul id="sheet-marketing">${bullets(n.marketing)}</ul></div>
+        <div class="rep-sec"><h3>٥. الأداء المالي</h3>
+          <table><thead><tr><th>البند</th><th>المبلغ</th><th>% من الإيراد</th></tr></thead><tbody>
+          <tr><td>إيراد الخدمات المنفذة</td><td><strong>${money(c.rev)}</strong></td><td>${c.rev?"100%":"—"}</td></tr>
+          ${expRows.map(([k,v])=>`<tr><td>مصروف: ${esc(k)}</td><td style="color:var(--red)">− ${money(v)}</td><td>${c.rev?Math.round(v/c.rev*100)+"%":"—"}</td></tr>`).join("")}
+          <tr><td><strong>الصافي (المحصّل − المصاريف)</strong></td><td style="color:${c.net>=0?"var(--green)":"var(--red)"}"><strong>${money(c.net)}</strong></td><td></td></tr>
+          </tbody></table>
+        </div>
+        <div class="rep-sec"><h3>٦. النشاط العلاجي (أعلى الخدمات)</h3>
+          ${svc.length?`<table><thead><tr><th>الخدمة</th><th>عدد المرات</th><th>الإيراد</th><th>المتوسط</th></tr></thead><tbody>
+          ${svc.slice(0,10).map(r=>`<tr><td>${esc(r.name)}</td><td>${r.count}</td><td><strong>${money(r.total)}</strong></td><td>${money(r.total/r.count)}</td></tr>`).join("")}
+          </tbody></table>`:`<ul><li style="color:var(--muted);list-style:none;margin-right:-20px">لا خدمات منفذة بالفترة</li></ul>`}
+        </div>
+        <div class="rep-sec"><h3>٧. حركة المرضى وقنوات الاستقطاب</h3>
+          <table><thead><tr><th>القناة (الاسم الموحد)</th><th>عدد المرضى</th><th>النسبة</th></tr></thead><tbody>
+          ${Object.entries(c.src).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td><td>${Math.round(v/srcTotal*100)}%</td></tr>`).join("")||`<tr><td colspan="3" style="color:var(--muted)">لا بيانات بالفترة</td></tr>`}
+          </tbody></table>
+        </div>
+        <div class="rep-sec"><h3>٨. أبرز الملاحظات والتوصيات</h3>
+          <ul>${recs.map(r=>`<li><b>${r[0].replace(/^[^ ]+ /,"")}:</b> ${r[1].replace(/<[^>]+>/g,"")}</li>`).join("")||`<li style="color:var(--muted);list-style:none;margin-right:-20px">لا ملاحظات</li>`}</ul>
+        </div>
+        <div class="rep-sec"><h3>٩. ${NARR_TABS[3][1].substring(2)}</h3><ul id="sheet-nextTasks">${bullets(n.nextTasks)}</ul></div>
+        <div class="rep-sign"><span>توقيع مدير العيادة: ..........................</span><span>أُعدّ آلياً من نظام عيادة أوراس</span></div>
+      </div>`;
+    }
+
+    /* ===== شريط الفلاتر (فترات سريعة + مخصص + مقارنة) ===== */
+    function reportPeriodToolbar(){
+      const[s,e]=reportRange();
+      const count=getVisibleVisits().filter(v=>(v.date||"")>=ymd(s)&&(v.date||"")<=ymd(e)).length;
+      return`
+      <div class="report-toolbar print-hide">
+        <div class="report-chips">${REPORT_PERIODS.map(([k,l])=>`<button class="${reportPeriod===k?"active":""}" data-report-period="${k}">${l}</button>`).join("")}</div>
+        <div class="report-custom" style="${reportPeriod==="custom"?"":"display:none"}">
+          <input id="reportFrom" type="date" value="${reportCustom.from||""}"> <span>←</span> <input id="reportTo" type="date" value="${reportCustom.to||""}">
+        </div>
+        <div style="flex:1"></div>
+        <label class="report-toggle"><input type="checkbox" id="reportCompareToggle" ${reportCompare?"checked":""}> مقارنة بالفترة السابقة</label>
+        <div class="button-row">
+          <button class="secondary" data-action="print-comprehensive" title="تقرير مفصّل يضم بنود المنصرفات والمعامل والأطباء">📋 نسخة مفصّلة</button>
+          <button class="secondary" data-action="export-report">⬇ تصدير Excel</button>
+          <button class="primary" data-action="print-report">🖨 طباعة / PDF</button>
+        </div>
+      </div>
+      <p class="period-line print-hide">📌 الفترة المعروضة: <b>${fmtDay(s)}</b> ← <b>${fmtDay(e)}</b>${reportCompare?" • المقارنة تلقائياً مع الفترة المكافئة السابقة":""} • <b>${count}</b> زيارة بالفترة</p>`;
+    }
+
+    /* ===== صفحة التقارير الرئيسية ===== */
+    function reportsPage(){
+      if(!adminUnlocked) return lockedPage("التقارير ولوحة القرار","بيانات التقارير المالية والتشغيلية متاحة للمدير فقط.");
+      const[s,e]=reportRange();
+      const cur=computeRange(s,e);
+      let prev=null;
+      if(reportCompare&&activeReportTab!=="monthly"){const[ps,pe]=prevRangeOf(s,e);prev=computeRange(ps,pe)}
+      const tabs=[["dash","① لوحة القرار التفاعلية"],["print","② التقرير الرسمي للطباعة"],["monthly","📄 التقرير الشهري الرسمي"]];
       return`<section class="view">
         <div class="heading">
-          <div><p class="eyebrow">إدارة وتقييم العيادة</p><h1>التقرير الشامل لأداء عيادة الأسنان</h1><p class="sub">تقرير شامل ومفصل يجيب عن كافة المحاور المالية، التشغيلية، والطبية.</p></div>
-          <div class="button-row"><button class="secondary" data-action="print-comprehensive">🖨️ طباعة التقرير الشامل</button><button class="primary" data-view="new-visit">＋ إضافة زيارة</button></div>
+          <div><p class="eyebrow">إدارة وتقييم العيادة</p><h1>التقارير ولوحة القرار</h1><p class="sub">كل الأرقام محسوبة فعلياً من سجلات العيادة خلال الفترة المحددة — الزيارات، التحصيل، المصاريف، المخزون، المعامل، وقنوات المعرفة — مع مقارنة تلقائية بالفترة السابقة وتوصيات مبنية على البيانات.</p></div>
         </div>
-        
         <div class="report-tabs">
-          <button class="${activeReportTab==='comprehensive'?'active':''}" data-report-tab="comprehensive">★ الملخص الشامل</button>
-          <button class="${activeReportTab==='financial_perf'?'active':''}" data-report-tab="financial_perf">1. الأداء المالي</button>
-          <button class="${activeReportTab==='patient_flow'?'active':''}" data-report-tab="patient_flow">2. حركة المرضى</button>
-          <button class="${activeReportTab==='clinical_qual'?'active':''}" data-report-tab="clinical_qual">3. الأداء الطبي</button>
-          <button class="${activeReportTab==='ops_inv'?'active':''}" data-report-tab="ops_inv">4. التشغيل والمخزون</button>
-          <button class="${activeReportTab==='marketing_sat'?'active':''}" data-report-tab="marketing_sat">5. التسويق والرضا</button>
-          <button class="${activeReportTab==='recommendations'?'active':''}" data-report-tab="recommendations">6. التوصيات</button>
-          <button class="${activeReportTab==='monthly'?'active':''}" data-report-tab="monthly">📄 التقرير الشهري الرسمي</button>
+          ${tabs.map(([k,l])=>`<button class="${activeReportTab===k?"active":""}" data-report-tab="${k}">${l}</button>`).join("")}
         </div>
-
-        ${activeReportTab!=='monthly' ? `<div class="toolbar">
-          <div class="button-row">
-            <label class="field"><span class="question-title">من تاريخ</span><input id="reportFrom" type="date"></label>
-            <label class="field"><span class="question-title">إلى تاريخ</span><input id="reportTo" type="date"></label>
-          </div>
-          <span class="sub">${filtered.length} زيارة في الفترة المحددة</span>
-        </div>` : ``}
-
+        ${activeReportTab!=="monthly"?reportPeriodToolbar():""}
         <div id="reportTabContent">
-          ${renderActiveReportContent(filtered, totalRev, totalPaid, totalDue, totalExp, netProfit)}
+          ${activeReportTab==="dash"?renderDashReport(cur,prev):activeReportTab==="print"?renderPrintReport():monthlySection()}
         </div>
       </section>`;
     }
 
-    function renderActiveReportContent(filteredVisits, totalRev, totalPaid, totalDue, totalExp, netProfit){
-      const totalPatientsCount = patients.length || 1;
-
-      if(activeReportTab === 'monthly') {
-        return monthlySection();
-      }
-
-      if(activeReportTab === 'comprehensive') {
-        return `
-        <div class="report-cards">
-          ${card("إجمالي الإيرادات", money(totalRev), "قيمة الخدمات المنجزة", "💰")}
-          ${card("المصاريف الكلية", money(totalExp), "مصاريف ثابتة ومتغيرة", "💸")}
-          ${card("صافي الربح الفعلي", money(netProfit), "المحصل - المصاريف", "📈")}
-          ${card("إجمالي الزيارات", filteredVisits.length, "الزيارات المنجزة", "◷")}
-        </div>
-        <div class="stats" style="grid-template-columns:repeat(3,1fr)">
-          ${card("الديون المعلقة", money(totalDue), "متبقية عند المرضى", "⚠️")}
-          ${card("طلبات المعامل", labs.length, "تركيبات وتقويم بالمعمل", "🦷")}
-          ${card("تنبيهات المخزون", inventory.filter(i=>Number(i.qty)<=Number(i.minQty)).length, "أصناف أوشكت على النفاد", "📦")}
-        </div>
-        <section class="panel detail-block" style="margin:20px 0; background:#fcfaf5">
-           <h3 style="color:var(--gold-dark);font-size:18px;margin-bottom:15px">ملخص أداء العيادة</h3>
-           <p style="font-size:15px;line-height:2">
-             يقدم هذا الملخص نظرة تجميعية لكل أنشطة العيادة خلال الفترة المحددة. تم تسجيل <strong>${filteredVisits.length}</strong> زيارة، نتج عنها إيرادات محصلة فعلية بقيمة <strong>${money(totalPaid)}</strong> مقابل مصروفات شاملة بلغت <strong>${money(totalExp)}</strong>.<br>
-             وبالتالي تم تحقيق هامش ربحي مقداره <strong>${totalPaid ? Math.round((netProfit/totalPaid)*100) : 0}%</strong>.<br>
-             يجب الانتباه لوجود ديون معلقة بقيمة <strong>${money(totalDue)}</strong> تتطلب خطة للتحصيل، وتوجد <strong>${inventory.filter(i=>Number(i.qty)<=Number(i.minQty)).length}</strong> مواد يجب إعادة طلبها من الموردين لضمان استمرار العمل دون توقف.
-           </p>
-        </section>`;
-      }
-
-      if(activeReportTab === 'financial_perf') {
-        const procMap = {};
-        filteredVisits.forEach(v => {
-          const items = v.items && v.items.length ? v.items : [{procedure:v.procedure, cost:v.cost}];
-          items.forEach(it => {
-            if(!it.procedure) return;
-            procMap[it.procedure] = procMap[it.procedure] || {count:0, total:0};
-            procMap[it.procedure].count++;
-            procMap[it.procedure].total += Number(it.cost||0);
-          });
-        });
-        const rows = Object.keys(procMap).map(k => ({ name:k, ...procMap[k] })).sort((a,b)=>b.total-a.total);
-
-        return `
-        <div class="report-cards">
-          ${card("إجمالي الإيرادات", money(totalRev), "قيمة الخدمات المنجزة", "💰")}
-          ${card("المبالغ المحصلة فعلياً", money(totalPaid), "تدفق نقدي وارد", "✅")}
-          ${card("المصاريف الكلية", money(totalExp), "مصاريف ثابتة ومتغيرة", "💸")}
-          ${card("صافي الربح الفعلي", money(netProfit), "المحصل - المصاريف", "📈")}
-        </div>
-        <div class="stats" style="grid-template-columns:repeat(2,1fr)">
-          ${card("الديون المعلقة عند المرضى", money(totalDue), "مبالغ متبقية لم تحصل بعد", "⚠️")}
-          ${card("هامش الربحية التقريبي", totalPaid ? Math.round((netProfit/totalPaid)*100) + "%" : "0%", "نسبة الصافي إلى المحصل", "📊")}
-        </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>ربحية الخدمات والإجراءات الطبية</h2><p>ترتيب الخدمات الأكثر ربحية واستهلاكاً للموارد</p></div></div>
-          ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>اسم الخدمة / الإجراء</th><th>عدد مرات التنفيذ</th><th>إجمالي الدخل</th><th>متوسط الخدمة</th></tr></thead><tbody>${rows.map(r => `<tr><td><strong>${esc(r.name)}</strong></td><td><span class="badge gold">${r.count}</span></td><td><strong>${money(r.total)}</strong></td><td>${money(r.total/r.count)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">لا توجد بيانات مالية بالفترة المحددة.</div>`}
-        </section>`;
-      }
-
-      if(activeReportTab === 'patient_flow') {
-        const newPatientsCount = filteredVisits.filter(v=>v.visitType==='جديد').length;
-        const returnVisitsCount = filteredVisits.filter(v=>v.visitType==='متابعة').length;
-        const noShowCount = filteredVisits.filter(v=>v.status==='ملغاة').length;
-        const totalVisits = filteredVisits.length || 1;
-
-        const chairMap = {};
-        filteredVisits.forEach(v => {
-          const c = v.chair || "كرسي 1";
-          chairMap[c] = (chairMap[c] || 0) + 1;
-        });
-
-        return `
-        <div class="report-cards">
-          ${card("إجمالي الزيارات", filteredVisits.length, "زيارات للفترة", "◷")}
-          ${card("مرضى جدد", newPatientsCount, "استقطاب جديد", "♙")}
-          ${card("مرضى مترددين (متابعة)", returnVisitsCount, "نسبة الاستبقاء", "🔄")}
-          ${card("نسبة إلغاء المواعيد (No-Show)", Math.round((noShowCount/totalVisits)*100) + "%", `${noShowCount} مواعيد ملغاة`, "❌")}
-        </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>إنتاجية كراسي العيادة (Dental Chair Rate)</h2><p>توزيع الزيارات حسب وحدات الأسنان بالعيادة</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>رقم الكرسي / العيادة</th><th>عدد الزيارات المنفذة</th><th>النسبة من الإجمالي</th></tr></thead><tbody>${Object.keys(chairMap).map(c => `<tr><td><strong>${esc(c)}</strong></td><td><span class="badge blue">${chairMap[c]} زيارات</span></td><td><strong>${Math.round((chairMap[c]/totalVisits)*100)}%</strong></td></tr>`).join("")}</tbody></table></div>
-        </section>`;
-      }
-
-      if(activeReportTab === 'clinical_qual') {
-        const docMap = {};
-        filteredVisits.forEach(v => {
-          const doc = v.doctor || "د. عثمان";
-          docMap[doc] = docMap[doc] || { count:0, total:0 };
-          docMap[doc].count++;
-          docMap[doc].total += Number(v.cost||0);
-        });
-
-        const completedPlans = filteredVisits.filter(v=>v.planStatus==='مكتملة').length;
-        const ongoingPlans = filteredVisits.filter(v=>v.planStatus==='قيد العلاج').length;
-
-        return `
-        <div class="report-cards">
-          ${card("خطط علاجبية مكتملة", completedPlans, "مرضى أتموا علاجهم", "✅")}
-          ${card("خطط قيد العلاج", ongoingPlans, "جلسات مستمرة", "⏳")}
-          ${card("طلبات المعامل", labs.length, "تركيبات وتقويم", "🦷")}
-          ${card("تكلفة المعامل الكلية", money(labs.reduce((s,l)=>s+Number(l.cost||0),0)), "مستحقات المعامل", "💸")}
-        </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>إنتاجية الأطباء والدخل المحقق</h2><p>أداء كل طبيب عدد الحالات والإيراد</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>اسم الطبيب المعالج</th><th>عدد الحالات والأشخاص</th><th>إجمالي الدخل المحقق</th></tr></thead><tbody>${Object.keys(docMap).map(d => `<tr><td><strong>${esc(d)}</strong></td><td><span class="badge gold">${docMap[d].count} حالات</span></td><td><strong>${money(docMap[d].total)}</strong></td></tr>`).join("")}</tbody></table></div>
-        </section>`;
-      }
-
-      if(activeReportTab === 'ops_inv') {
-        const lowInvCount = inventory.filter(i=>Number(i.qty)<=Number(i.minQty)).length;
-
-        return `
-        <div class="report-cards">
-          ${card("أنواع المواد بالمخزون", inventory.length, "أصناف مسجلة", "📦")}
-          ${card("تنبيه النقص", lowInvCount, "مواد أوشكت على النفاد", "⚠️")}
-          ${card("طلبات المعامل الخارجية", labs.length, "حالة تركيبات", "🦷")}
-          ${card("متوسط زمن الجلسة", "35 دقيقة", "استغلال وقت الكرسي", "⏱️")}
-        </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>حالة المخزون والمواد الطبية</h2><p>متابعة النقص لتفادي توقف العمل</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>اسم المادة</th><th>الكمية الحالية</th><th>حد الأمان</th><th>الحالة</th></tr></thead><tbody>${inventory.map(i => `<tr><td><strong>${esc(i.name)}</strong></td><td>${esc(i.qty)} ${esc(i.unit)}</td><td>${esc(i.minQty)}</td><td><span class="badge ${Number(i.qty)<=Number(i.minQty)?'red':'green'}">${Number(i.qty)<=Number(i.minQty)?'يحتاج طلب':'متوفر'}</span></td></tr>`).join("")}</tbody></table></div>
-        </section>`;
-      }
-
-      if(activeReportTab === 'marketing_sat') {
-        const refMap = {};
-        patients.forEach(p => {
-          const refs = Array.isArray(p.referral) ? p.referral : [p.referral||"غير محدد"];
-          refs.forEach(r => refMap[r] = (refMap[r]||0)+1);
-        });
-
-        const totalMktExp = expenses.filter(e=>e.category==='تسويق وإعلانات').reduce((s,e)=>s+Number(e.amount||0),0);
-        const newP = filteredVisits.filter(v=>v.visitType==='جديد').length || 1;
-        const cac = Math.round(totalMktExp / newP);
-
-        return `
-        <div class="report-cards">
-          ${card("مصاريف التسويق", money(totalMktExp), "إجمالي الحملات", "📣")}
-          ${card("تكلفة استقطاب المريض (CAC)", money(cac), "مصاريف التسويق ÷ مرضى جدد", "🎯")}
-          ${card("متوسط تقييم المرضى", "4.8 / 5", "مستوى الرضا العام", "⭐")}
-          ${card("إجمالي الشكاوى", filteredVisits.filter(v=>v.complaintType&&v.complaintType!=='لا يوجد').length, "ملاحظات مسجلة", "💬")}
-        </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>مصادر استقطاب المرضى (قنوات التسويق)</h2><p>من أين يأتي مرضاك؟</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>قناة التسويق / المصدر</th><th>عدد المرضى</th><th>النسبة المئوية</th></tr></thead><tbody>${Object.keys(refMap).map(r => `<tr><td><strong>${esc(r)}</strong></td><td><span class="badge blue">${refMap[r]} مريض</span></td><td><strong>${Math.round((refMap[r]/totalPatientsCount)*100)}%</strong></td></tr>`).join("")}</tbody></table></div>
-        </section>`;
-      }
-
-      if(activeReportTab === 'recommendations') {
-        return `
-        <section class="panel" style="padding:25px">
-          <div class="panel-head" style="padding:0 0 15px"><div><h2>التوصيات والخطط الذكية المستنتجة</h2><p>خطوات تصحيحية وفرص نمو بناءً على بيانات العيادة</p></div></div>
-          <div style="display:grid;gap:15px;margin-top:15px">
-            <div style="padding:15px;background:#fcfaf5;border-right:4px solid var(--gold);border-radius:8px">
-              <strong>1. تحسين التحصيل المالي والديون:</strong> هناك ديون معلقة بمبلغ <strong>${money(totalDue)}</strong>. يوصى بتفعيل نظام الدفع المقدم قبل بدء الجلسات العلاجية.
-            </div>
-            <div style="padding:15px;background:#fcfaf5;border-right:4px solid var(--green);border-radius:8px">
-              <strong>2. تعزيز الاستثمارات التسويقية:</strong> أعلى نسبة استقطاب للمرضى تأتي من شبكات التواصل الاجتماعي والخرائط.
-            </div>
-            <div style="padding:15px;background:#fcfaf5;border-right:4px solid var(--blue);border-radius:8px">
-              <strong>3. متابعة التجهيزات والمخزون:</strong> تأكد من تغذية المخزون الأصناف ذات حد الأمان المنخفض قبل نفادها بالكامل.
-            </div>
-          </div>
-        </section>`;
-      }
-      return '';
+    /* ===== تصدير Excel (بمكتبة XLSX الموجودة في النظام) ===== */
+    function exportReportExcel(){
+      try{
+        if(typeof XLSX==="undefined"||!XLSX.utils){message("مكتبة Excel غير متاحة حالياً.");return}
+        const[s,e]=reportRange();
+        const c=computeRange(s,e);
+        const R=v=>Math.round(Number(v||0));
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+          ["تقرير عيادة أوراس — من "+ymd(s)+" إلى "+ymd(e)],
+          [],
+          ["البيان","القيمة (ج.س)"],
+          ["إجمالي الإيراد",R(c.rev)],
+          ["المحصّل فعلياً",R(c.paid)],
+          ["ديون الفترة",R(c.due)],
+          ["المصاريف",R(c.exp)],
+          ["صافي (المحصّل − المصاريف)",R(c.net)],
+          ["عدد الزيارات",c.vs.length],
+          ["مرضى جدد",c.newP],
+          ["متابعون",c.rep],
+          ["نسبة الإلغاء %",Math.round(c.cancelRate)],
+          ["متوسط الفاتورة",R(c.avgInvoice)],
+          ["طلبات المعامل",c.labList.length],
+          ["تكلفة المعامل",R(c.labCost)]
+        ]),"الملخص");
+        const svc=Object.entries(c.svc).map(([n,d])=>({name:n,count:d.n,total:d.total})).sort((a,b)=>b.total-a.total);
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["الخدمة","عدد المرات","الإيراد","المتوسط"],...svc.map(r=>[r.name,r.count,R(r.total),R(r.total/r.count)])]),"الخدمات");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["المريض","المتبقي","عدد الفواتير","أقدم فاتورة"],...Object.entries(c.debtors).sort((a,b)=>b[1].amt-a[1].amt).map(([n,d])=>[n,R(d.amt),d.n,d.oldest])]),"الديون");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["بند المصروف","المبلغ"],...Object.entries(c.expByCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,R(v)])]),"المصاريف");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["قناة المعرفة","عدد المرضى"],...Object.entries(c.src).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v])]),"قنوات المعرفة");
+        XLSX.writeFile(wb,"تقرير-"+ymd(s)+"_الى_"+ymd(e)+".xlsx");
+        message("تم تصدير التقرير بصيغة Excel.");
+      }catch(err){message("تعذر التصدير: "+(err&&err.message||err))}
     }
 
     /* ========= بناء تقرير شامل حقيقي (يُطبع من زر الطباعة الشامل) ========= */
     function reportPeriodRange(){
-      const from = document.getElementById("reportFrom")?.value;
-      const to = document.getElementById("reportTo")?.value;
+      const fromEl = document.getElementById("reportFrom");
+      const toEl = document.getElementById("reportTo");
+      if(!fromEl && !toEl || (!fromEl?.value && !toEl?.value)){
+        // لا حقول تاريخ مخصصة بالصفحة → اتبع فترة التقارير المختارة
+        const [ps,pe] = reportRange();
+        return {from:ymd(ps), to:ymd(pe), inRange:(d)=>{const v=d||"";return v>=ymd(ps)&&v<=ymd(pe)}};
+      }
+      const from = fromEl ? fromEl.value : "";
+      const to = toEl ? toEl.value : "";
       const inRange = (d) => {
         if(!from && !to) return true;
         const v = d || "";
@@ -1803,7 +2076,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
     function buildComprehensivePrint(){
       const {from, to, inRange} = reportPeriodRange();
-      const visits = reportFiltered().filter(v=>inRange(v.date));
+      const visits = getVisibleVisits().filter(v=>inRange(v.date));
       const expP = expenses.filter(e=>inRange(e.date));
       const labsP = labs.filter(l=>inRange(l.date));
 
@@ -1832,7 +2105,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const chairMap = {};
       visits.forEach(v=>{ const c=v.chair||"كرسي 1"; chairMap[c]=(chairMap[c]||0)+1; });
       const refMap = {};
-      patients.forEach(p=>{ const refs=Array.isArray(p.referral)?p.referral:[p.referral||"غير محدد"]; refs.forEach(r=>refMap[r]=(refMap[r]||0)+1); });
+      patients.forEach(p=>{ const refs=Array.isArray(p.referral)?p.referral:[p.referral||"غير محدد"]; dedupeChannels(refs.length?refs:["غير محدد"]).forEach(r=>{refMap[r]=(refMap[r]||0)+1;}); });
       const lowInv = inventory.filter(i=>Number(i.qty)<=Number(i.minQty));
       const mktExp = expP.filter(e=>e.category==="تسويق وإعلانات").reduce((s,e)=>s+Number(e.amount||0),0);
       const newP = visits.filter(v=>v.visitType==="جديد").length || 1;
@@ -1985,7 +2258,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         challenges: [""],
         marketing: [""],
         nextTasks: [""],
-        channels: [{label:"فيس بوك",count:0},{label:"لافتة خارجية",count:0},{label:"صديق",count:0},{label:"مر بالصدفة",count:0},{label:"طبيب آخر",count:0}],
+        channels: defaultChannelRows(),
         operational: {workDays:"", newFiles:"", visits:"", repeatRate:"", avgDaily:"", topService:""},
         financial: {revenue:"", expenses:"", salaries:"", rent:"", netProfit:"", avgDailyIncome:"", topDayIncome:"", avgInvoice:""},
         expenseBreakdown: [{label:"إيجار",amount:0},{label:"مواد طبية",amount:0},{label:"مرتبات",amount:0},{label:"تسويق وإعلام",amount:0},{label:"كهرباء وانترنت",amount:0},{label:"مواصلات",amount:0},{label:"ضيافات",amount:0},{label:"مصروفات تشغيلية",amount:0}]
@@ -2030,9 +2303,9 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const channelMap = {};
       monthPatients.forEach(p=>{
         const refs = Array.isArray(p.referral) ? p.referral : (p.referral ? [p.referral] : ["غير محدد"]);
-        refs.forEach(r=>{ channelMap[r] = (channelMap[r]||0)+1; });
+        refs.forEach(r=>{ const k = normChannel(r)||"غير محدد"; channelMap[k] = (channelMap[k]||0)+1; });
       });
-      const channels = Object.keys(channelMap).length ? Object.keys(channelMap).map(k=>({label:k,count:channelMap[k]})) : [{label:"فيس بوك",count:0},{label:"لافتة خارجية",count:0},{label:"صديق",count:0},{label:"مر بالصدفة",count:0},{label:"طبيب آخر",count:0}];
+      const channels = Object.keys(channelMap).length ? Object.keys(channelMap).map(k=>({label:k,count:channelMap[k]})).sort((a,b)=>b.count-a.count) : defaultChannelRows();
 
       const expCatMap = {};
       monthExpenses.forEach(e=>{ const c = e.category||"أخرى"; expCatMap[c] = (expCatMap[c]||0) + Number(e.amount||0); });
@@ -2210,7 +2483,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           amount: Number(row.querySelector(".dyn-val")?.value || 0)
         })).filter(r=>r.label);
       };
-      d.channels = readKV("channels").map(r=>({label:r.label,count:r.count}));
+      d.channels = mergeChannels(readKV("channels").map(r=>({label:r.label,count:r.count})));
       d.expenseBreakdown = readKV("expenseBreakdown").map(r=>({label:r.label,amount:r.amount}));
 
       d.operational = {
@@ -2564,7 +2837,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         data.conditions = fd.getAll("conditions");
         data.allergies = fd.getAll("allergies");
         data.habits = fd.getAll("habits");
-        data.referral = fd.getAll("referral");
+        data.referral = dedupeChannels(fd.getAll("referral"));
         data.reason = fd.getAll("reason");
         data.gender = fd.getAll("gender");
         data.marital = fd.getAll("marital");
@@ -2765,6 +3038,30 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           render();
         });
       });
+
+      document.querySelectorAll("[data-report-period]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          reportPeriod = btn.dataset.reportPeriod;
+          render();
+        });
+      });
+
+      const cmpTgl = document.getElementById("reportCompareToggle");
+      if(cmpTgl){
+        cmpTgl.checked = reportCompare;
+        cmpTgl.addEventListener("change", ()=>{ reportCompare = cmpTgl.checked; render(); });
+      }
+      const rFrom = document.getElementById("reportFrom"), rTo = document.getElementById("reportTo");
+      if(rFrom){
+        rFrom.addEventListener("change", ()=>{
+          if(rFrom.value){ reportCustom.from = rFrom.value; if(!reportCustom.to) reportCustom.to = rFrom.value; reportPeriod = "custom"; render(); }
+        });
+      }
+      if(rTo){
+        rTo.addEventListener("change", ()=>{
+          if(rTo.value){ reportCustom.to = rTo.value; if(!reportCustom.from) reportCustom.from = rTo.value; reportPeriod = "custom"; render(); }
+        });
+      }
 
       document.getElementById("addProcedureBtn")?.addEventListener("click", async ()=>{
         const name = await showPromptModal("إضافة إجراء جديد", "أدخل اسم الإجراء الطبي الجديد.", "اسم الإجراء", "", "text");
@@ -2970,6 +3267,11 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           changeRolePassword(r);
         } else if(act==="print"){
           window.print();
+        } else if(act==="print-report"){
+          if(activeReportTab!=="print"){activeReportTab="print";render();setTimeout(()=>window.print(),300)}
+          else window.print();
+        } else if(act==="export-report"){
+          exportReportExcel();
         } else if(act==="print-comprehensive"){
           printComprehensiveReport();
         } else if(act==="backup"){
