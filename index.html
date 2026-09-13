@@ -662,6 +662,11 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
     "use strict";
     const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", NARRATIVES_KEY="oras-dental-report-narratives-v1", PLANS_KEY="oras-dental-treatment-plans-v1", today=new Date().toISOString().slice(0,10);
+    /* ===== حماية البيانات من الفقدان (إصلاح مشكلة اختفاء ملفات المرضى) ===== */
+    const BACKUP_KEY="oras-dental-autobackup-v1";
+    const FORM_VIEWS=["new-patient","edit-patient","new-visit","edit-visit","treatment-plan"];
+    let pendingExternalUpdate=false, pendingNotice="";
+    const earlyDataWarnings=[];
     const ARABIC_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
     const THEME_KEY="oras-dental-theme-v1";
     const MORNING_PASS_KEY="oras-dental-morning-pass-v1", EVENING_PASS_KEY="oras-dental-evening-pass-v1", MANAGER_PASS_KEY="oras-dental-manager-pass-v1";
@@ -780,6 +785,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         monthlyReports=load(MONTHLY_KEY,[]);
 
         migrateChannelData();
+        dedupeCollectionIds();
 
     let theme=localStorage.getItem(THEME_KEY)||"default";
     let currentRole=null, selectedLoginRole=null;
@@ -789,25 +795,119 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     let narratives=(function(){try{const v=JSON.parse(localStorage.getItem(NARRATIVES_KEY)||"{}");return (v&&typeof v==="object"&&!Array.isArray(v))?v:{}}catch(e){return{}}})();
     let monthlySubView="list", selectedMonthlyId=null, monthlyDraft=null;
 
-    function load(key,fallback){try{const saved=JSON.parse(localStorage.getItem(key));return Array.isArray(saved)?saved:fallback}catch(e){return fallback}}
+    function load(key,fallback){
+      let raw=null;
+      try{ raw=localStorage.getItem(key); }catch(e){ return fallback; }
+      if(raw===null||raw===undefined||raw==="") return fallback;
+      try{
+        const saved=JSON.parse(raw);
+        return Array.isArray(saved)?saved:fallback;
+      }catch(e){
+        /* بيانات تالفة: نحفظ نسخة من الخام للفحص اليدوي ثم نحاول النسخة التلقائية بدل فقدان كل شيء */
+        try{ localStorage.setItem(key+".corrupt."+Date.now(), raw); }catch(_){}
+        try{
+          const snap=readBackupSnapshot();
+          const map={[PATIENTS_KEY]:"patients",[VISITS_KEY]:"visits",[PROCEDURES_KEY]:"procedures",[LISTS_KEY]:"customLists",[EXPENSES_KEY]:"expenses",[INVENTORY_KEY]:"inventory",[LABS_KEY]:"labs",[PLANS_KEY]:"treatmentPlans",[MONTHLY_KEY]:"monthlyReports"};
+          const bk=(snap&&snap.data&&Array.isArray(snap.data[map[key]]))?sanitizeImported(snap.data[map[key]],"bk"):[];
+          if(bk.length){
+            earlyDataWarnings.push("تم اكتشاف بيانات تالفة واسترجاعها تلقائيًا من النسخة الاحتياطية — يُنصح بتنزيل نسخة احتياطية جديدة فورًا.");
+            return bk;
+          }
+        }catch(_){}
+        earlyDataWarnings.push("تحذير: تم اكتشاف بيانات تالفة في التخزين المحلي — تم الاحتفاظ بنسخة منها للفحص.");
+        return fallback;
+      }
+    }
     
     function saveLocal(){
-      try{
-        localStorage.setItem(PATIENTS_KEY,JSON.stringify(patients));
-        localStorage.setItem(VISITS_KEY,JSON.stringify(visits));
-        localStorage.setItem(PROCEDURES_KEY,JSON.stringify(procedures));
-        localStorage.setItem(LISTS_KEY,JSON.stringify(customLists));
-        localStorage.setItem(EXPENSES_KEY,JSON.stringify(expenses));
-        localStorage.setItem(INVENTORY_KEY,JSON.stringify(inventory));
-        localStorage.setItem(LABS_KEY,JSON.stringify(labs));
-        localStorage.setItem(PLANS_KEY,JSON.stringify(treatmentPlans));
-        localStorage.setItem(MONTHLY_KEY,JSON.stringify(monthlyReports));
-      }catch(e){}
+      /* حفظ كل مجموعة على حدة حتى لا يُسقط فشل مفتاح واحد بقية البيانات، مع نسخة تلقائية عند النجاح */
+      const jobs=[
+        [PATIENTS_KEY,patients],[VISITS_KEY,visits],[PROCEDURES_KEY,procedures],
+        [LISTS_KEY,customLists],[EXPENSES_KEY,expenses],[INVENTORY_KEY,inventory],
+        [LABS_KEY,labs],[PLANS_KEY,treatmentPlans],[MONTHLY_KEY,monthlyReports]
+      ];
+      const failed=[];
+      jobs.forEach(([k,v])=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ failed.push(k); } });
+      if(!failed.length){ snapshotCurrentData("auto"); }
+      return failed;
     }
 
     async function save(){
-      saveLocal();
+      const failed=saveLocal();
       updateNotificationBadge();
+      if(failed&&failed.length){
+        console.error("Save failed for keys:", failed);
+        message("⚠️ تحذير: تعذّر حفظ البيانات على هذا الجهاز (قد تكون الذاكرة ممتلئة) — صدّر نسخة احتياطية فورًا من القائمة الجانبية ولا تغلق الصفحة قبل ذلك.");
+      }
+      return !(failed&&failed.length);
+    }
+
+    /* ===== دوال مساعدة لحماية البيانات ===== */
+    function uid(prefix){
+      let rnd="";
+      try{
+        if(typeof crypto!=="undefined"&&crypto.getRandomValues){
+          rnd=Array.from(crypto.getRandomValues(new Uint8Array(6))).map(b=>b.toString(36)).join("");
+        }
+      }catch(e){}
+      if(!rnd) rnd=Math.random().toString(36).slice(2,10);
+      return (prefix||"")+Date.now().toString(36)+"-"+rnd+Math.floor(Math.random()*46656).toString(36);
+    }
+    function readBackupSnapshot(){
+      try{
+        const v=JSON.parse(localStorage.getItem(BACKUP_KEY)||"null");
+        return (v&&v.data&&typeof v.data==="object")?v:null;
+      }catch(e){ return null; }
+    }
+    function snapshotCurrentData(reason){
+      try{
+        localStorage.setItem(BACKUP_KEY, JSON.stringify({t:Date.now(), reason:reason||"auto",
+          data:{patients,visits,procedures,customLists,expenses,inventory,labs,treatmentPlans,monthlyReports}}));
+      }catch(e){/* النسخة التلقائية اختيارية — تجاهل فشلها بصمت */}
+    }
+    function sanitizeImported(arr, tag){
+      if(!Array.isArray(arr)) return [];
+      const seen=new Set(), out=[];
+      arr.forEach(r=>{
+        if(!r||typeof r!=="object") return;
+        const rec={...r};
+        rec.id=(rec.id===undefined||rec.id===null||rec.id==="")?"":String(rec.id);
+        if(!rec.id||seen.has(rec.id)) rec.id=uid(tag||"r");
+        seen.add(rec.id);
+        out.push(rec);
+      });
+      return out;
+    }
+    function dedupeCollectionIds(){
+      /* إصلاح أي سجلات تحمل معرّفات مكررة (سبب محتمل لحذف سجل عند حذف/تعديل آخر) */
+      let fixed=0;
+      const fix=list=>{
+        if(!Array.isArray(list)) return;
+        const seen=new Set();
+        list.forEach(r=>{
+          if(!r||typeof r!=="object") return;
+          const id=(r.id===undefined||r.id===null)?"":String(r.id);
+          if(!id||seen.has(id)){ r.id=uid("fix"); fixed++; }
+          seen.add(String(r.id));
+        });
+      };
+      [patients,visits,treatmentPlans,procedures,expenses,inventory,labs,customLists,monthlyReports].forEach(fix);
+      if(fixed>0){
+        try{ saveLocal(); }catch(e){}
+        earlyDataWarnings.push("تم إصلاح "+fixed+" من السجلات كانت تحمل أرقامًا مكررة قد تسبب اختفاء ملفات — تم منحها أرقامًا فريدة.");
+      }
+    }
+    function nextFileNumber(){
+      let m=0;
+      try{ patients.forEach(p=>{const n=parseInt(p&&p.file,10); if(!isNaN(n)&&n>m) m=n;}); }catch(e){}
+      return m+1;
+    }
+    function flushEarlyWarnings(){
+      if(!earlyDataWarnings.length) return;
+      const msg=earlyDataWarnings.join(" ");
+      earlyDataWarnings.length=0;
+      console.warn("Data warnings:", msg);
+      try{ message(msg); }catch(e){}
     }
 
     // تم تعطيل المزامنة الشبكية — يعمل النظام محلياً بالكامل
@@ -1687,6 +1787,17 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             <div class="pass-card"><span class="tile-icon">ص</span><div><strong>موظف الصباح</strong><span>كلمة مرور الوردية الصباحية</span></div><button class="secondary" data-action="change-role-pass" data-role="morning">تغيير</button></div>
             <div class="pass-card"><span class="tile-icon">م</span><div><strong>موظف المساء</strong><span>كلمة مرور الوردية المسائية</span></div><button class="secondary" data-action="change-role-pass" data-role="evening">تغيير</button></div>
             <div class="pass-card"><span class="tile-icon">د</span><div><strong>المدير</strong><span>كلمة مرور حساب المدير</span></div><button class="secondary" data-action="change-role-pass" data-role="manager">تغيير</button></div>
+          </div>
+        </section>` : ""}
+
+        ${adminUnlocked ? `
+        <section class="panel" style="padding:22px;margin-bottom:24px">
+          <div class="panel-head" style="padding:0 0 15px;border-bottom:1px solid var(--line)">
+            <div><h2>🛡️ حماية البيانات والاسترجاع التلقائي</h2><p>يحفظ النظام نسخة احتياطية تلقائية على هذا الجهاز عند كل حفظ ناجح، وقبل أي عملية استيراد — استخدمها للاسترجاع الفوري عند الحاجة.</p></div>
+          </div>
+          <div class="button-row" style="margin-top:14px">
+            <button class="secondary" data-action="restore-autobackup">↩ استرجاع آخر نسخة تلقائية</button>
+            <button class="secondary" data-action="backup">⇩ تنزيل نسخة احتياطية (JSON)</button>
           </div>
         </section>` : ""}
 
@@ -2691,7 +2802,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div class="form-section">
             <div class="section-title"><span class="section-num">1</span><h2>البيانات الشخصية</h2></div>
             <div class="form-grid">
-              <div class="field"><label>رقم الملف <span class="required">*</span></label><input name="file" value="${p.file||(patients.length+1)}" required></div>
+              <div class="field"><label>رقم الملف <span class="required">*</span></label><input name="file" value="${p.file||nextFileNumber()}" required></div>
               <div class="field"><label>الاسم <span class="required">*</span></label><input name="fullName" value="${esc(p.fullName)}" required></div>
               <div class="field"><label>العمر (بالسنوات)</label><input type="number" name="age" value="${esc(p.age)}"></div>
               <div class="field"><label>رقم الواتساب <span class="required">*</span></label><input dir="ltr" name="phone" value="${esc(p.phone)}" required></div>
@@ -3317,6 +3428,18 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
 
     function render(){
+      /* حماية من الكتابة فوق ملف موجود عند إضافة ملف جديد:
+         نماذج الإضافة تمسح أي معرّف تعديل قديم، وشاشات التعديل تتحقق من وجود السجل أولًا */
+      if(view==="new-patient") editingPatientId=null;
+      if(view==="new-visit") editingVisitId=null;
+      if(view==="edit-patient" && !patients.some(p=>p.id===editingPatientId)){
+        editingPatientId=null; view="patients";
+        pendingNotice="لم يتم العثور على ملف المريض المطلوب — تم الرجوع لدليل المرضى.";
+      }
+      if(view==="edit-visit" && !visits.some(v=>v.id===editingVisitId)){
+        editingVisitId=null; view="visits";
+        pendingNotice="لم يتم العثور على الزيارة المطلوبة — تم الرجوع لسجل الزيارات.";
+      }
       applyTheme();
       updateSecurityUI();
       const c = document.getElementById("content");
@@ -3345,6 +3468,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       else if(view==="reports") c.innerHTML = reportsPage();
 
       bindEvents();
+      if(pendingNotice){ const n=pendingNotice; pendingNotice=""; message(n); }
     }
 
     function calcVisitTotals(){
@@ -3383,17 +3507,24 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         data.time = fd.getAll("time");
         data.service = fd.getAll("service");
 
-        if(editingPatientId){
-          const idx = patients.findIndex(p=>p.id===editingPatientId);
-          if(idx!==-1) patients[idx] = {...patients[idx], ...data};
+        /* التعديل يتم فقط من شاشة التعديل ومعرّف صالح — أي حالة أخرى تعني إضافة ملف جديد دائمًا */
+        const wantEditP = (view==="edit-patient") && editingPatientId;
+        const pIdx = wantEditP ? patients.findIndex(p=>p.id===editingPatientId) : -1;
+        if(wantEditP && pIdx===-1){
+          message("تعذّر حفظ التعديلات: الملف الأصلي غير موجود (ربما حُذف من نافذة أخرى) — بيانات النموذج ما زالت أمامك ولم يُفقد شيء.");
+          return;
+        }
+        if(wantEditP){
+          patients[pIdx] = {...patients[pIdx], ...data};
           message("تم تعديل بيانات المريض بنجاح.");
-          editingPatientId = null;
         } else {
-          data.id = String(Date.now());
+          data.id = uid("");
           data.created = today;
           patients.push(data);
           message("تم إضافة المريض بنجاح.");
         }
+        editingPatientId = null;
+        pendingExternalUpdate = false;
         save();
         view = "patients";
         render();
@@ -3425,17 +3556,24 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         const p = getPatient(data.patientId);
         if(p) data.patientName = p.fullName;
 
-        if(editingVisitId){
-          const idx = visits.findIndex(v=>v.id===editingVisitId);
-          if(idx!==-1) visits[idx] = {...visits[idx], ...data};
+        /* التعديل يتم فقط من شاشة التعديل ومعرّف صالح — أي حالة أخرى تعني تسجيل زيارة جديدة دائمًا */
+        const wantEditV = (view==="edit-visit") && editingVisitId;
+        const vIdx = wantEditV ? visits.findIndex(v=>v.id===editingVisitId) : -1;
+        if(wantEditV && vIdx===-1){
+          message("تعذّر حفظ التعديلات: الزيارة الأصلية غير موجودة (ربما حُذفت من نافذة أخرى) — بيانات النموذج ما زالت أمامك ولم يُفقد شيء.");
+          return;
+        }
+        if(wantEditV){
+          visits[vIdx] = {...visits[vIdx], ...data};
           message("تم تعديل الزيارة بنجاح.");
-          editingVisitId = null;
         } else {
-          data.id = String(Date.now());
+          data.id = uid("");
           data.status = "مكتملة";
           visits.push(data);
           message("تم تسجيل الزيارة بنجاح.");
         }
+        editingVisitId = null;
+        pendingExternalUpdate = false;
         save();
         view = "visits";
         render();
@@ -3472,7 +3610,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           planFormPlanId = treatmentPlans[idx].id;
           message("تم حفظ تعديلات الخطة العلاجية بنجاح.");
         } else {
-          data.id = String(Date.now());
+          data.id = uid("");
           treatmentPlans.push(data);
           planFormPlanId = data.id;
           message("تم حفظ الخطة العلاجية بنجاح.");
@@ -3663,7 +3801,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         if(!name) return;
         const cost = await showPromptModal("سعر الإجراء", "أدخل السعر الافتراضي للإجراء (ج.س).", "السعر", "10000", "number");
         if(cost===null) return;
-        procedures.push({id: "p"+Date.now(), name: name, cost: Number(cost||0)});
+        procedures.push({id: uid("p"), name: name, cost: Number(cost||0)});
         save();
         render();
         message("تمت إضافة الإجراء الجديد.");
@@ -3672,7 +3810,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       document.getElementById("addExpenseBtn")?.addEventListener("click", async ()=>{
         const data = await showAppModal({title:"تسجيل مصروف جديد", submitLabel:"تسجيل المصروف", fields: expenseFields({})});
         if(!data) return;
-        expenses.push({id:"e"+Date.now(), title:data.title, amount:Number(data.amount||0), type:data.type||"متغيرة", category:data.category||"عام", date:data.date||today, notes:data.notes||""});
+        expenses.push({id:uid("e"), title:data.title, amount:Number(data.amount||0), type:data.type||"متغيرة", category:data.category||"عام", date:data.date||today, notes:data.notes||""});
         save();
         render();
         message("تم تسجيل المصروف.");
@@ -3681,7 +3819,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       document.getElementById("addInvBtn")?.addEventListener("click", async ()=>{
         const data = await showAppModal({title:"إضافة صنف للمخزون", submitLabel:"تسجيل المادة", fields: inventoryFields({})});
         if(!data) return;
-        inventory.push({id:"i"+Date.now(), name:data.name, qty:Number(data.qty||0), minQty:Number(data.minQty||0), unit:data.unit||"قطعة", expireDate:data.expireDate||today});
+        inventory.push({id:uid("i"), name:data.name, qty:Number(data.qty||0), minQty:Number(data.minQty||0), unit:data.unit||"قطعة", expireDate:data.expireDate||today});
         save();
         render();
         message("تمت إضافة المادة للمخزون.");
@@ -3690,7 +3828,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       document.getElementById("addLabBtn")?.addEventListener("click", async ()=>{
         const data = await showAppModal({title:"تسجيل طلب معمل", submitLabel:"تسجيل الطلب", fields: labFields({})});
         if(!data) return;
-        labs.push({id:"l"+Date.now(), labName:data.labName, patientName:data.patientName, toothNumber:data.toothNumber||"11", workType:data.workType||"تركيبة", cost:Number(data.cost||0), status:data.status||"قيد التصنيع", rating:data.rating||"ممتاز", date:data.date||today});
+        labs.push({id:uid("l"), labName:data.labName, patientName:data.patientName, toothNumber:data.toothNumber||"11", workType:data.workType||"تركيبة", cost:Number(data.cost||0), status:data.status||"قيد التصنيع", rating:data.rating||"ممتاز", date:data.date||today});
         save();
         render();
         message("تم تسجيل طلب المعمل.");
@@ -3699,7 +3837,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       document.getElementById("addListBtn")?.addEventListener("click", async ()=>{
         const title = await showPromptModal("قائمة جديدة", "أدخل اسم القائمة المخصصة.", "عنوان القائمة", "", "text");
         if(!title) return;
-        customLists.push({id:"l"+Date.now(), title, items:[]});
+        customLists.push({id:uid("lst"), title, items:[]});
         save();
         render();
         message("تم إنشاء القائمة.");
@@ -3726,7 +3864,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           const idx = monthlyReports.findIndex(r=>r.id===d.id);
           if(idx!==-1) monthlyReports[idx] = d;
         } else {
-          d.id = "mr"+Date.now();
+          d.id = uid("mr");
           monthlyReports.push(d);
         }
         save();
@@ -3904,6 +4042,35 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           printComprehensiveReport();
         } else if(act==="backup"){
           await backupToJSON();
+        } else if(act==="restore-autobackup"){
+          if(!adminUnlocked){
+            message("استرجاع النسخة التلقائية متاح فقط في وضع المدير.");
+            return;
+          }
+          const snap=readBackupSnapshot();
+          if(!snap||!snap.data){
+            message("لا توجد نسخة تلقائية محفوظة بعد.");
+            return;
+          }
+          const d=snap.data, parts=[];
+          if(Array.isArray(d.patients)) parts.push(d.patients.length+" ملف مريض");
+          if(Array.isArray(d.visits)) parts.push(d.visits.length+" زيارة");
+          if(Array.isArray(d.treatmentPlans)) parts.push(d.treatmentPlans.length+" خطة علاجية");
+          let when=""; try{ when=new Date(snap.t).toLocaleString("ar"); }catch(e){}
+          if(!confirm("سيتم استبدال البيانات الحالية بالنسخة التلقائية"+(when?(" المحفوظة بتاريخ "+when):"")+" ("+(parts.join("، ")||"بدون بيانات")+") — وسيتم الاحتفاظ بلقطة من بياناتك الحالية أولًا. هل أنت متأكد؟")) return;
+          snapshotCurrentData("pre-autorestore");
+          if(Array.isArray(d.patients)) patients=sanitizeImported(d.patients,'p');
+          if(Array.isArray(d.visits)) visits=sanitizeImported(d.visits,'v');
+          if(Array.isArray(d.procedures)) procedures=sanitizeImported(d.procedures,'p');
+          if(Array.isArray(d.customLists)) customLists=sanitizeImported(d.customLists,'lst');
+          if(Array.isArray(d.expenses)) expenses=sanitizeImported(d.expenses,'e');
+          if(Array.isArray(d.inventory)) inventory=sanitizeImported(d.inventory,'i');
+          if(Array.isArray(d.labs)) labs=sanitizeImported(d.labs,'l');
+          if(Array.isArray(d.treatmentPlans)) treatmentPlans=sanitizeImported(d.treatmentPlans,'pl');
+          if(Array.isArray(d.monthlyReports)) monthlyReports=sanitizeImported(d.monthlyReports,'mr');
+          save();
+          render();
+          message("تم استرجاع النسخة التلقائية بنجاح.");
         } else if(act==="restore"){
           // Try File System Access API first, then fallback to hidden input
           if(window.showOpenFilePicker){
@@ -3934,7 +4101,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             const data = await showAppModal({title:"إضافة شخص للقائمة", submitLabel:"إضافة", fields: listItemFields({})});
             if(!data) return;
             list.items = list.items || [];
-            list.items.push({id:"i"+Date.now(), patientName:data.name, phone:data.phone||"", date:data.date||today, notes:data.notes||""});
+            list.items.push({id:uid("it"), patientName:data.name, phone:data.phone||"", date:data.date||today, notes:data.notes||""});
             save();
             render();
             message("تمت الإضافة إلى القائمة.");
@@ -3974,7 +4141,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             return;
           }
           const draft = emptyMonthlyDraft();
-          draft.id = "mr_" + year + "_" + String(month).padStart(2, "0") + "_" + Date.now();
+          draft.id = "mr_" + year + "_" + String(month).padStart(2, "0") + "_" + uid("");
           draft.reportNumber = (monthlyReports.length || 0) + 1;
           draft.year = year;
           draft.month = month;
@@ -4088,19 +4255,29 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
                 });
               };
 
+              const EXPECTED_SHEETS=['patients','visits','procedures','customLists','expenses','inventory','labs','monthlyReports'];
+              const presentSheets=EXPECTED_SHEETS.filter(n=>workbook.Sheets[n]);
+              if(!presentSheets.length){
+                message("ملف Excel لا يحتوي على أي ورقة بيانات معروفة — لم يتم تغيير أي بيانات.");
+                resolve();
+                return;
+              }
+
               if(!confirm("هل أنت متأكد من استعادة النسخة الاحتياطية؟ سيتم تحديث البيانات الحالية بالبيانات المستوردة.")) {
                 resolve();
                 return;
               }
 
-              patients = sheetToJSON('patients');
-              visits = sheetToJSON('visits');
-              procedures = sheetToJSON('procedures');
-              customLists = sheetToJSON('customLists');
-              expenses = sheetToJSON('expenses');
-              inventory = sheetToJSON('inventory');
-              labs = sheetToJSON('labs');
-              monthlyReports = sheetToJSON('monthlyReports');
+              snapshotCurrentData("pre-restore");
+              /* نحدّث فقط المجموعات الموجودة فعلًا في الملف — حتى لا يمسح غياب ورقةٍ بياناتِها */
+              if(workbook.Sheets['patients']) patients = sanitizeImported(sheetToJSON('patients'),'p');
+              if(workbook.Sheets['visits']) visits = sanitizeImported(sheetToJSON('visits'),'v');
+              if(workbook.Sheets['procedures']) procedures = sanitizeImported(sheetToJSON('procedures'),'p');
+              if(workbook.Sheets['customLists']) customLists = sanitizeImported(sheetToJSON('customLists'),'lst');
+              if(workbook.Sheets['expenses']) expenses = sanitizeImported(sheetToJSON('expenses'),'e');
+              if(workbook.Sheets['inventory']) inventory = sanitizeImported(sheetToJSON('inventory'),'i');
+              if(workbook.Sheets['labs']) labs = sanitizeImported(sheetToJSON('labs'),'l');
+              if(workbook.Sheets['monthlyReports']) monthlyReports = sanitizeImported(sheetToJSON('monthlyReports'),'mr');
 
               save();
               render();
@@ -4138,16 +4315,23 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             }
 
             const source = parsed.data || parsed;
+            const KNOWN_KEYS=['patients','visits','procedures','customLists','expenses','inventory','labs','treatmentPlans','monthlyReports'];
+            if(!KNOWN_KEYS.some(k=>Array.isArray(source[k]))){
+              message("خطأ: الملف لا يحتوي على أي بيانات عيادة صالحة — لم يتم تغيير أي بيانات.");
+              resolve();
+              return;
+            }
 
-            if(Array.isArray(source.patients)) patients = source.patients;
-            if(Array.isArray(source.visits)) visits = source.visits;
-            if(Array.isArray(source.procedures)) procedures = source.procedures;
-            if(Array.isArray(source.customLists)) customLists = source.customLists;
-            if(Array.isArray(source.expenses)) expenses = source.expenses;
-            if(Array.isArray(source.inventory)) inventory = source.inventory;
-            if(Array.isArray(source.labs)) labs = source.labs;
-            if(Array.isArray(source.treatmentPlans)) treatmentPlans = source.treatmentPlans;
-            if(Array.isArray(source.monthlyReports)) monthlyReports = source.monthlyReports;
+            snapshotCurrentData("pre-restore");
+            if(Array.isArray(source.patients)) patients = sanitizeImported(source.patients,'p');
+            if(Array.isArray(source.visits)) visits = sanitizeImported(source.visits,'v');
+            if(Array.isArray(source.procedures)) procedures = sanitizeImported(source.procedures,'p');
+            if(Array.isArray(source.customLists)) customLists = sanitizeImported(source.customLists,'lst');
+            if(Array.isArray(source.expenses)) expenses = sanitizeImported(source.expenses,'e');
+            if(Array.isArray(source.inventory)) inventory = sanitizeImported(source.inventory,'i');
+            if(Array.isArray(source.labs)) labs = sanitizeImported(source.labs,'l');
+            if(Array.isArray(source.treatmentPlans)) treatmentPlans = sanitizeImported(source.treatmentPlans,'pl');
+            if(Array.isArray(source.monthlyReports)) monthlyReports = sanitizeImported(source.monthlyReports,'mr');
 
             if(parsed.settings && parsed.settings.theme){
               setTheme(parsed.settings.theme);
@@ -4201,11 +4385,39 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     });
 
 
+    /* مزامنة النوافذ: عند تغيّر البيانات في نافذة/تبويب آخر نلتقطها فورًا
+       حتى لا يحفظ تبويب قديم فوق بيانات جديدة (سبب شائع لاختفاء آخر الملفات) */
+    function reloadAllFromStorage(){
+      patients=load(PATIENTS_KEY,patients);
+      visits=load(VISITS_KEY,visits);
+      procedures=load(PROCEDURES_KEY,procedures);
+      customLists=load(LISTS_KEY,customLists);
+      expenses=load(EXPENSES_KEY,expenses);
+      inventory=load(INVENTORY_KEY,inventory);
+      labs=load(LABS_KEY,labs);
+      treatmentPlans=load(PLANS_KEY,treatmentPlans);
+      monthlyReports=load(MONTHLY_KEY,monthlyReports);
+    }
+    window.addEventListener("storage",(e)=>{
+      if(e.key && !String(e.key).startsWith("oras-dental-")) return;
+      if(e.key===BACKUP_KEY) return;
+      reloadAllFromStorage();
+      flushEarlyWarnings();
+      if(FORM_VIEWS.includes(view)){
+        pendingExternalUpdate=true;
+        message("تنبيه: تغيّرت البيانات في نافذة أخرى — أكمل نموذجك الحالي وسيُحفظ مع أحدث البيانات دون فقدان.");
+      } else {
+        render();
+        message("تم تحديث العرض بأحدث البيانات من النافذة الأخرى.");
+      }
+    });
+
     window.addEventListener("DOMContentLoaded", ()=>{
       initializeRoleGate();
       applyTheme();
       checkAndAutoGenerateMonthlyReport();
       render();
+      flushEarlyWarnings();
     });
   
   </script>
