@@ -307,6 +307,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     .admin-badge-indicator {display: none;align-items: center;gap: 6px;padding: 6px 14px;border-radius: 20px;background: linear-gradient(135deg, #d8a838 0%, #8a6415 100%);border: 1px solid #ffe6a3;color: #ffffff;font-size: 11px;font-weight: 800;box-shadow: 0 0 12px rgba(216, 168, 56, 0.5);}
     body.is-admin .admin-badge-indicator {display: inline-flex !important;}
     body.is-admin [data-action="admin"] {background: #c39a3d !important;color: #120f0a !important;font-weight: 800 !important;border: 1px solid #ffe6a3 !important;box-shadow: 0 0 10px rgba(195, 154, 61, 0.4);}
+    /* الموظف (صباح/مساء) مدخل بيانات فقط: إخفاء كل أزرار استخراج البيانات (نسخ احتياطي، استعادة، تصدير) خارج وضع المدير */
+    body:not(.is-admin) .nav button[data-action="backup"],
+    body:not(.is-admin) .nav button[data-action="restore"],
+    body:not(.is-admin) button[data-action="export-patients"],
+    body:not(.is-admin) button[data-action="export-patient"],
+    body:not(.is-admin) button[data-action="export-expenses"],
+    body:not(.is-admin) button[data-action="export-report"],
+    body:not(.is-admin) button[data-action="export-visits"] {display:none !important;}
 
     .list-card {border:1px solid var(--line);border-radius:15px;background:var(--card);padding:20px;margin-bottom:20px;box-shadow:var(--shadow)}
     .list-header {display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid var(--line);padding-bottom:10px}
@@ -956,6 +964,15 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function getVisibleVisits(){
       return visibleVisits(visits);
     }
+    /* الزيارات بعد تطبيق تصفية البحث والتاريخ في صفحة سجل الزيارات (تُستخدم في العرض والتصدير) */
+    function getFilteredVisibleVisits(){
+      const q=document.getElementById("visitSearch")?.value.trim().toLowerCase()||"";
+      const d=document.getElementById("visitDate")?.value||"";
+      let active=getVisibleVisits();
+      if(q) active=active.filter(v=>(v.patientName||"").toLowerCase().includes(q)||(v.mainComplaint||"").toLowerCase().includes(q)||(v.doctor||"").toLowerCase().includes(q));
+      if(d) active=active.filter(v=>v.date===d);
+      return active;
+    }
     function forceCurrentShift(data){
       if(isEmployeeRole()){
         const s = currentRole === "morning" ? "صباح" : "مساء";
@@ -1144,6 +1161,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       updateNotificationBadge();
       const label=document.querySelector("[data-admin-label]");
       if(label)label.textContent=adminUnlocked?"خروج المدير":"دخول المدير";
+      /* الموظف مدخل بيانات فقط: أزرار استخراج البيانات (نسخ احتياطي/استعادة) تظهر في وضع المدير فقط */
+      document.querySelectorAll('.nav button[data-action="backup"],.nav button[data-action="restore"]').forEach(b=>{
+        b.style.display=adminUnlocked?"":"none";
+      });
       const roleTitle = document.getElementById("userRoleTitle");
       const roleSubtitle = document.getElementById("userRoleSubtitle");
       const avatar = document.getElementById("userAvatar");
@@ -1753,7 +1774,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         <div class="heading">
           <div><p class="eyebrow">الشؤون المالية</p><h1>سجل المصاريف والمشتريات</h1><p class="sub">كل الحسابات تتم حسب <b>تاريخ المنصرف</b> — اختر فترة زمنية لرؤية منصرفاتها وإجمالياتها وبنودها.</p></div>
           <div class="button-row">
-            <button class="secondary" data-action="export-expenses">⬇ تصدير Excel للفترة</button>
+            ${adminUnlocked?`<button class="secondary" data-action="export-expenses">⬇ تصدير Excel للفترة</button>`:""}
             <button class="primary" id="addExpenseBtn">＋ تسجيل مصروف جديد</button>
           </div>
         </div>
@@ -1981,13 +2002,13 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </section>`;
     }
 
-    function patientsPage(){return`<section class="view"><div class="heading"><div><p class="eyebrow">الملفات الرقمية</p><h1>دليل المرضى</h1><p class="sub">ابحث وراجع سجلات المرضى، مع عدد الزيارات لكل مريض.</p></div><div class="button-row"><button class="secondary" data-action="export-patients" title="تصدير كل تفاصيل ملفات المرضى (البيانات الشخصية، التاريخ الطبي، الاستبيان، الزيارات، الإجراءات، الخطط العلاجية) إلى ملف Excel">⬇ تصدير ملفات المرضى (Excel)</button><button class="primary" data-view="new-patient">＋ ملف مريض جديد</button></div></div><div class="toolbar"><input id="patientSearch" placeholder="بحث بالاسم أو رقم الملف أو الجوال..."><span class="sub">${patients.length} سجلات محفوظة</span></div><section class="panel" id="table">${patientTable(patients)}</section></section>`}
+    function patientsPage(){return`<section class="view"><div class="heading"><div><p class="eyebrow">الملفات الرقمية</p><h1>دليل المرضى</h1><p class="sub">ابحث وراجع سجلات المرضى، مع عدد الزيارات لكل مريض.</p></div><div class="button-row">${adminUnlocked?`<button class="secondary" data-action="export-patients" title="تصدير كل تفاصيل ملفات المرضى (البيانات الشخصية، التاريخ الطبي، الاستبيان، الزيارات، الإجراءات، الخطط العلاجية) إلى ملف Excel">⬇ تصدير ملفات المرضى (Excel)</button>`:""}<button class="primary" data-view="new-patient">＋ ملف مريض جديد</button></div></div><div class="toolbar"><input id="patientSearch" placeholder="بحث بالاسم أو رقم الملف أو الجوال..."><span class="sub">${patients.length} سجلات محفوظة</span></div><section class="panel" id="table">${patientTable(patients)}</section></section>`}
     
     function patientTable(list){if(!list.length)return`<div class="empty">لا توجد نتائج مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>رقم الملف</th><th>اسم المريض</th><th>الهاتف</th><th>مصدر المعرفة</th><th>عدد الزيارات المتاحة</th><th>آخر زيارة</th><th>إجراءات</th></tr></thead><tbody>${list.map(p=>{const pv=getPatientVisits(p.id);const refStr = Array.isArray(p.referral)?p.referral.join("، "):value(p.referral);return`<tr><td>#${esc(p.file)}</td><td><strong>${value(p.fullName)}</strong></td><td dir="ltr">${value(p.phone)}</td><td><span class="badge blue">${refStr}</span></td><td><span class="badge gold">${pv.length} زيارة</span></td><td>${pv[0]?date(pv[0].date):"لا توجد"}</td><td><div class="button-row">${button("فتح الملف","open-patient",p.id)}${button("تسجيل زيارة","new-visit-for",p.id,"primary")}${button("الخطة العلاجية","treatment-plan",p.id)}${adminUnlocked?button("حذف","delete-patient",p.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
     
     function visitsPage(){
       const activeVisits = getVisibleVisits();
-      return`<section class="view"><div class="heading"><div><p class="eyebrow">المتابعة اليومية</p><h1>سجل الزيارات والحالات</h1><p class="sub">كل إجراء طبي تم تنفيذه مع المريض والمدفوعات والمستحقات.</p></div><button class="primary" data-view="new-visit">＋ تسجيل زيارة جديدة</button></div><div class="toolbar"><input id="visitSearch" placeholder="بحث باسم المريض أو الطبيب أو الشكوى..."><input id="visitDate" type="date" title="تصفية حسب التاريخ"><span class="sub">${activeVisits.length} زيارة مسجلة</span></div><section class="panel" id="visitsTable">${visitsTable(activeVisits)}</section></section>`
+      return`<section class="view"><div class="heading"><div><p class="eyebrow">المتابعة اليومية</p><h1>سجل الزيارات والحالات</h1><p class="sub">كل إجراء طبي تم تنفيذه مع المريض والمدفوعات والمستحقات.</p></div><div class="button-row">${adminUnlocked?`<button class="secondary" data-action="export-visits" title="تصدير كل الزيارات الظاهرة حالياً (مع مراعاة البحث والتاريخ المحدد) إلى ملف Excel">⬇ تصدير الزيارات (Excel)</button>`:""}<button class="primary" data-view="new-visit">＋ تسجيل زيارة جديدة</button></div></div><div class="toolbar"><input id="visitSearch" placeholder="بحث باسم المريض أو الطبيب أو الشكوى..."><input id="visitDate" type="date" title="تصفية حسب التاريخ"><span class="sub">${activeVisits.length} زيارة مسجلة</span></div><section class="panel" id="visitsTable">${visitsTable(activeVisits)}</section></section>`
     }
     
     function visitsTable(list){if(!list.length)return`<div class="empty">لا توجد زيارات مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>الرقم/التاريخ</th><th>المريض / الكرسي</th><th>الطبيب والشفت</th><th>الشكوى والتشخيص</th><th>المبالغ (إجمالي/مدفوع/دين)</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${list.sort((a,b)=>b.date.localeCompare(a.date)).map(v=>{const p=getPatient(v.patientId);const name = p ? p.fullName : (v.patientName || "غير محدد");return`<tr><td><strong>زيارة (${value(v.visitNum||"1")})</strong><br><small class="sub">${date(v.date)}</small></td><td><strong>${value(name)}</strong><br><small class="sub">${value(v.chair||"كرسي 1")}</small></td><td><strong>${value(v.doctor||"د. عثمان")}</strong><br><span class="badge gold">${value(v.shift||"صباح")}</span></td><td><strong>الشكوى:</strong> ${value(v.mainComplaint)}<br><small class="sub"><strong>العلاج:</strong> ${value(visitProcedureNames(v))}</small>${v.planWorked?`<br><small class="sub" style="color:var(--gold-dark)"><strong>من الخطة العلاجية:</strong> ${esc(v.planWorked)}</small>`:""}</td><td><strong>الإجمالي:</strong> ${money(v.cost)}<br><small class="sub" style="color:var(--green)">مدفوع: ${money(v.paid||0)}</small><br><small class="sub" style="color:var(--red)">متبقي: ${money(v.due||0)}</small></td><td><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></td><td><div class="button-row">${button("تعديل","edit-visit",v.id)}${adminUnlocked?button("حذف","delete-visit",v.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
@@ -2479,6 +2500,41 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         ]),"حسب البند");
         const ok=await saveWorkbook(wb,"المنصرفات-"+(a||"البداية")+"_الى_"+(b||"الآن")+".xlsx");
         if(ok) message("تم تصدير منصرفات الفترة إلى Excel.");
+      }catch(err){console.error(err);message("تعذر التصدير: "+(err&&err.message||err))}
+    }
+
+    /* ===== تصدير سجل الزيارات إلى Excel (خاص بوضع المدير — مع مراعاة البحث والتاريخ المحددين في الصفحة) ===== */
+    async function exportVisitsExcel(){
+      try{
+        if(typeof XLSX==="undefined"||!XLSX.utils){message("مكتبة Excel غير متاحة حالياً.");return}
+        const list=getFilteredVisibleVisits().slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+        if(!list.length){message("لا توجد زيارات مطابقة لتصديرها.");return}
+        const fileOf=id=>{const p=getPatient(id);return p?String(p.file??""):""};
+        const nameOf=v=>{const p=getPatient(v.patientId);return p?p.fullName:(v.patientName||"غير محدد")};
+        const procTxt=v=>{const it=(Array.isArray(v.items)&&v.items.length)?v.items:[]; return it.length?it.filter(i=>i&&i.procedure).map(i=>i.procedure+" ("+xnum(i.cost).toLocaleString("en")+")").join("، "):(v.procedure||v.treatment||"");};
+        const rows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","إجمالي المبلغ (ج.س)","المدفوع (ج.س)","المتبقي (دين)","حالة الزيارة"]];
+        let tCost=0,tPaid=0,tDue=0,cancelled=0;
+        list.forEach(v=>{
+          const done=v.status!=="ملغاة";
+          rows.push([fileOf(v.patientId),nameOf(v),v.visitNum||"",normDate(v.date)||"",v.shift||"",v.visitType||"",v.doctor||"",v.chair||"",v.mainComplaint||"",v.diagnosis||"",procTxt(v),v.planWorked||"",xnum(v.cost),xnum(v.paid),xnum(v.due),v.status||"مكتملة"]);
+          if(done){tCost+=xnum(v.cost);tPaid+=xnum(v.paid);tDue+=xnum(v.due);}else cancelled++;
+        });
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,xlsxSheet(rows),"الزيارات");
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+          ["ملخص تصدير الزيارات"],
+          [],
+          ["عدد الزيارات",list.length],
+          ["زيارات مكتملة",list.length-cancelled],
+          ["زيارات ملغاة",cancelled],
+          ["إجمالي قيمة العلاج (ج.س)",Math.round(tCost)],
+          ["إجمالي المدفوع (ج.س)",Math.round(tPaid)],
+          ["إجمالي المتبقي — دين (ج.س)",Math.round(tDue)],
+          [],
+          ["تاريخ التصدير",today]
+        ]),"الملخص");
+        const ok=await saveWorkbook(wb,"الزيارات-"+today+".xlsx");
+        if(ok) message("تم تصدير "+list.length+" زيارة إلى Excel بنجاح.");
       }catch(err){console.error(err);message("تعذر التصدير: "+(err&&err.message||err))}
     }
 
@@ -3163,7 +3219,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div class="button-row">
             <button class="secondary" data-view="patients">← رجوع لدليل المرضى</button>
             <button class="secondary" data-action="edit-patient" data-id="${p.id}">تعديل الملف</button>
-            <button class="secondary" data-action="export-patient" data-id="${esc(p.id)}" title="تصدير الملف المرضي كاملاً إلى Excel">⬇ تصدير الملف (Excel)</button>
+            ${adminUnlocked?`<button class="secondary" data-action="export-patient" data-id="${esc(p.id)}" title="تصدير الملف المرضي كاملاً إلى Excel">⬇ تصدير الملف (Excel)</button>`:""}
             <button class="secondary" data-action="treatment-plan" data-id="${p.id}">الخطة العلاجية</button>
             <button class="primary" data-action="new-visit-for" data-id="${p.id}">＋ تسجيل زيارة</button>
           </div>
@@ -4091,13 +4147,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
 
     function filterVisitsUI(){
-        const q = document.getElementById("visitSearch")?.value.trim().toLowerCase()||"";
-        const d = document.getElementById("visitDate")?.value||"";
-        let active = getVisibleVisits();
-        if(q) active = active.filter(v=>(v.patientName||"").toLowerCase().includes(q) || (v.mainComplaint||"").toLowerCase().includes(q) || (v.doctor||"").toLowerCase().includes(q));
-        if(d) active = active.filter(v=>v.date===d);
         const vt = document.getElementById("visitsTable");
-        if(vt) vt.innerHTML = visitsTable(active);
+        if(vt) vt.innerHTML = visitsTable(getFilteredVisibleVisits());
       }
 
       document.querySelectorAll("[data-report-tab]").forEach(btn=>{
@@ -4218,6 +4269,13 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         const act = actionBtn.dataset.action;
         const id = actionBtn.dataset.id;
 
+        /* صلاحيات: الموظف (صباح/مساء) مدخل بيانات فقط — كل عمليات استخراج البيانات
+           (نسخ احتياطي، استعادة/استيراد، تصدير Excel) متاحة في وضع المدير فقط */
+        const MANAGER_ONLY_ACTIONS=["backup","restore","restore-autobackup","export-patients","export-patient","export-expenses","export-report","export-visits"];
+        if(!adminUnlocked && MANAGER_ONLY_ACTIONS.includes(act)){
+          message("🔒 هذه العملية متاحة للمدير فقط — حساب الموظف مخصص للإدخال ولا يتيح استخراج البيانات من النظام.");
+          return;
+        }
         
         if(act==="notifications"){
           openNotificationModal();
@@ -4374,6 +4432,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           else window.print();
         } else if(act==="export-report"){
           exportReportExcel();
+        } else if(act==="export-visits"){
+          exportVisitsExcel();
         } else if(act==="export-expenses"){
           exportExpensesExcel();
         } else if(act==="export-patients"){
