@@ -940,6 +940,24 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       try{return localStorage.getItem(rolePasswordKey(role))||DEFAULT_ROLE_PASSWORDS[role]}catch(e){return DEFAULT_ROLE_PASSWORDS[role]}
     }
     function isEmployeeRole(){ return currentRole==="morning" || currentRole==="evening"; }
+
+    /* ==================================================================
+       أقسام محجوبة عن الموظف (المدير فقط):
+       المصاريف والمشتريات · المخزون والمواد · معامل الأسنان
+       تُطبَّق على: أزرار القائمة الجانبية، فتح الصفحة مباشرة،
+       أي رابط/إجراء يصل لهذه الأقسام، وبلوكات التنبيهات الخاصة بها.
+       ================================================================== */
+    const EMPLOYEE_HIDDEN_VIEWS = ["expenses","inventory","labs"];
+    const EMPLOYEE_HIDDEN_ACTIONS = ["add-expense","edit-expense","delete-expense","add-inv","update-inv-qty","delete-inv","add-lab","edit-lab","delete-lab"];
+    const HIDDEN_VIEW_INFO = {
+      expenses:  ["سجل المصاريف والمشتريات","بيانات المصاريف والمشتريات متاحة للمدير فقط."],
+      inventory: ["المخزون والمواد الطبية","بيانات المخزون والمواد متاحة للمدير فقط."],
+      labs:      ["سجل معامل الأسنان","بيانات معامل الأسنان متاحة للمدير فقط."]
+    };
+    /* المدير (أو وضع المدير المفعّل) هو من يرى هذه الأقسام */
+    function canSeeManagerSections(){ return adminUnlocked || currentRole==="manager"; }
+    function isHiddenForEmployee(name){ return !canSeeManagerSections() && EMPLOYEE_HIDDEN_VIEWS.includes(name); }
+    function hiddenViewMessage(name){ return "🔒 " + ((HIDDEN_VIEW_INFO[name]||["هذا القسم","هذا القسم"])[0]) + " متاح للمدير فقط."; }
     function currentShift(){ return currentRole==="morning" ? "morning" : currentRole==="evening" ? "evening" : null; }
     function normalizeShift(value){
       if(value===undefined || value===null) return "";
@@ -1068,9 +1086,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     
     
     function updateNotificationBadge(){
-      const lowInv = inventory.filter(i => Number(i.qty) <= Number(i.minQty));
+      /* الموظف لا يتنبه إلا للديون — تنبيهات المخزون والمعامل للمدير فقط */
+      const lowInv = canSeeManagerSections() ? inventory.filter(i => Number(i.qty) <= Number(i.minQty)) : [];
       const debts = visits.filter(v => Number(v.due || 0) > 0);
-      const pendingLabs = labs.filter(l => l.status === "قيد التصنيع" || l.status === "تم الإرسال");
+      const pendingLabs = canSeeManagerSections() ? labs.filter(l => l.status === "قيد التصنيع" || l.status === "تم الإرسال") : [];
       const hasAlerts = (lowInv.length + debts.length + pendingLabs.length) > 0;
       const dot = document.getElementById("bellDot");
       if(dot) dot.style.display = hasAlerts ? "block" : "none";
@@ -1095,6 +1114,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           </div>
         </div>
 
+        ${canSeeManagerSections() ? `
         <div style="border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--card)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <strong style="color:var(--red);display:flex;align-items:center;gap:6px">⚠️ تنبيهات نقص المخزون (${lowInv.length})</strong>
@@ -1111,7 +1131,9 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             </div>
           ` : `<div style="font-size:12px;color:var(--green)">✓ جميع المواد متوفرة بكميات كافية وأعلى من حد الأمان.</div>`}
         </div>
+        ` : ""}
 
+        ${canSeeManagerSections() ? `
         <div style="border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--card)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <strong style="color:var(--gold-dark);display:flex;align-items:center;gap:6px">🦷 طلبات المعامل قيد الإنجاز (${pendingLabs.length})</strong>
@@ -1128,6 +1150,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             </div>
           ` : `<div style="font-size:12px;color:var(--muted)">لا توجد طلبات معمل معلقة حالياً.</div>`}
         </div>
+        ` : ""}
 
         <div style="border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--card)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -1164,6 +1187,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       /* الموظف مدخل بيانات فقط: أزرار استخراج البيانات (نسخ احتياطي/استعادة) تظهر في وضع المدير فقط */
       document.querySelectorAll('.nav button[data-action="backup"],.nav button[data-action="restore"]').forEach(b=>{
         b.style.display=adminUnlocked?"":"none";
+      });
+      /* إخفاء أقسام المصاريف والمخزون ومعامل الأسنان عن الموظف — المدير فقط */
+      document.querySelectorAll(".nav button[data-view]").forEach(b=>{
+        if(EMPLOYEE_HIDDEN_VIEWS.includes(b.dataset.view)) b.style.display=canSeeManagerSections()?"":"none";
       });
       const roleTitle = document.getElementById("userRoleTitle");
       const roleSubtitle = document.getElementById("userRoleSubtitle");
@@ -1623,7 +1650,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const activeVisits = getVisibleVisits();
       const recent=[...activeVisits].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
       const totalDue = activeVisits.reduce((s,v)=>s+Number(v.due||0),0);
-      return`<section class="view"><div class="heading"><div><p class="eyebrow">لوحة إدارة عيادة الأسنان</p><h1>أهلاً بك، إدارة العيادة</h1><p class="sub">متابعة شاملة للأداء المالي، حركة المرضى، والمخزون بكفاءة عالية.</p></div><div class="button-row"><button class="secondary" data-view="reports">التقرير الشامل والأداء</button><button class="primary" data-view="new-visit">＋ تسجيل زيارة</button></div></div><div class="hero"><div class="hero-inner"><p class="eyebrow">بحث سريع</p><h2>ابحث في سجلات العيادة، المرضى، أو المواعيد</h2><p>ادخل اسم المريض، الجوال، أو رقم الملف للوصول السريع للسجل الطبي والزيارات.</p><div class="search"><span>⌕</span><input id="dashSearch" placeholder="اكتب اسم المريض، رقم الملف، أو الهاتف..." autocomplete="off"></div><div id="dashSearchResults"></div></div></div><div class="stats">${card("إجمالي المرضى",patients.length,"السجلات المحفوظة","♙")}${card("الزيارات المسجلة",activeVisits.length,"إجمالي الحالات المتاحة","◷")}${card("إجمالي الديون المعلقة",displayCost(totalDue),"مستحقات عند المرضى","💸")}${card("تنبيهات المخزون",inventory.filter(i=>i.qty<=i.minQty).length,"مواد أوشكت على النفاد","📦")}</div><div class="two-col"><section class="panel"><div class="panel-head"><div><h2>أحدث الزيارات والأبحاث</h2><p>آخر الإجراءات المسجلة بالعيادة</p></div><button class="link-btn" data-view="visits">سجل الزيارات ←</button></div>${recent.length?recent.map(v=>visitRow(v)).join(""):`<div class="empty">لا توجد زيارات متاحة لهذه الوردية.</div>`}</section><section class="panel"><div class="panel-head"><div><h2>الإجراءات الأكثر طلباً</h2><p>ترتيب الإجراءات حسب عدد المرات</p></div><button class="link-btn" data-view="reports">التقارير الشاملة ←</button></div>${topProcedures().map((r,i)=>`<div class="patient-row"><div class="initial">${i+1}</div><div class="row-main"><strong>${esc(r.name)}</strong><span>${r.count} زيارة مسجلة</span></div><div class="row-meta">${displayCost(r.total)}</div></div>`).join("")||`<div class="empty">ستظهر الإجراءات هنا بعد تسجيل الزيارات.</div>`}</section></div></section>`
+      return`<section class="view"><div class="heading"><div><p class="eyebrow">${canSeeManagerSections()?"لوحة إدارة عيادة الأسنان":"لوحة الاستقبال اليومية"}</p><h1>${canSeeManagerSections()?"أهلاً بك، إدارة العيادة":"أهلاً بك"}</h1><p class="sub">${canSeeManagerSections()?"متابعة شاملة للأداء المالي، حركة المرضى، والمخزون بكفاءة عالية.":"متابعة حركة المرضى والحجوزات والزيارات بكفاءة عالية."}</p></div><div class="button-row"><button class="secondary" data-view="reports">التقرير الشامل والأداء</button><button class="primary" data-view="new-visit">＋ تسجيل زيارة</button></div></div><div class="hero"><div class="hero-inner"><p class="eyebrow">بحث سريع</p><h2>ابحث في سجلات العيادة، المرضى، أو المواعيد</h2><p>ادخل اسم المريض، الجوال، أو رقم الملف للوصول السريع للسجل الطبي والزيارات.</p><div class="search"><span>⌕</span><input id="dashSearch" placeholder="اكتب اسم المريض، رقم الملف، أو الهاتف..." autocomplete="off"></div><div id="dashSearchResults"></div></div></div><div class="stats">${card("إجمالي المرضى",patients.length,"السجلات المحفوظة","♙")}${card("الزيارات المسجلة",activeVisits.length,"إجمالي الحالات المتاحة","◷")}${card("إجمالي الديون المعلقة",displayCost(totalDue),"مستحقات عند المرضى","💸")}${canSeeManagerSections()?card("تنبيهات المخزون",inventory.filter(i=>i.qty<=i.minQty).length,"مواد أوشكت على النفاد","📦"):""}</div><div class="two-col"><section class="panel"><div class="panel-head"><div><h2>أحدث الزيارات والأبحاث</h2><p>آخر الإجراءات المسجلة بالعيادة</p></div><button class="link-btn" data-view="visits">سجل الزيارات ←</button></div>${recent.length?recent.map(v=>visitRow(v)).join(""):`<div class="empty">لا توجد زيارات متاحة لهذه الوردية.</div>`}</section><section class="panel"><div class="panel-head"><div><h2>الإجراءات الأكثر طلباً</h2><p>ترتيب الإجراءات حسب عدد المرات</p></div><button class="link-btn" data-view="reports">التقارير الشاملة ←</button></div>${topProcedures().map((r,i)=>`<div class="patient-row"><div class="initial">${i+1}</div><div class="row-main"><strong>${esc(r.name)}</strong><span>${r.count} زيارة مسجلة</span></div><div class="row-meta">${displayCost(r.total)}</div></div>`).join("")||`<div class="empty">ستظهر الإجراءات هنا بعد تسجيل الزيارات.</div>`}</section></div></section>`
     }
 
         function appointmentsPage(){
@@ -3808,6 +3835,15 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         b.classList.toggle("active", b.dataset.view===view);
       });
 
+      /* حجب صفحات المصاريف والمخزون والمعامل عن حساب الموظف (حتى لو طُلبت مباشرة) */
+      if(isHiddenForEmployee(view)){
+        const info = HIDDEN_VIEW_INFO[view] || ["الصفحة","هذه الصفحة متاحة للمدير فقط."];
+        c.innerHTML = lockedPage(info[0], info[1]);
+        bindEvents();
+        if(pendingNotice){ const n=pendingNotice; pendingNotice=""; message(n); }
+        return;
+      }
+
       if(view==="dashboard") c.innerHTML = dashboard();
       else if(view==="appointments") c.innerHTML = appointmentsPage();
       else if(view==="patients") c.innerHTML = patientsPage();
@@ -4276,6 +4312,13 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           message("🔒 هذه العملية متاحة للمدير فقط — حساب الموظف مخصص للإدخال ولا يتيح استخراج البيانات من النظام.");
           return;
         }
+
+        /* أقسام المصاريف والمخزون ومعامل الأسنان محجوبة بالكامل عن الموظف:
+           لا عرض، ولا إضافة، ولا تعديل، ولا حذف */
+        if(!canSeeManagerSections() && EMPLOYEE_HIDDEN_ACTIONS.includes(act)){
+          message(hiddenViewMessage(act==="delete-inv"||act==="add-inv"||act==="update-inv-qty"?"inventory":(act.endsWith("-lab")?"labs":"expenses")));
+          return;
+        }
         
         if(act==="notifications"){
           openNotificationModal();
@@ -4622,7 +4665,13 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
       const viewBtn = e.target.closest("[data-view]");
       if(viewBtn && !e.target.closest("[data-action]")){
-        view = viewBtn.dataset.view;
+        const targetView = viewBtn.dataset.view;
+        /* الموظف لا ينتقل لأقسام المصاريف أو المخزون أو معامل الأسنان */
+        if(isHiddenForEmployee(targetView)){
+          message(hiddenViewMessage(targetView));
+          return;
+        }
+        view = targetView;
         render();
       }
     });
