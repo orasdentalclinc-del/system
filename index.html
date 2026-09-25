@@ -152,7 +152,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}button:focus-vis
     .hbar-row{display:grid;grid-template-columns:130px 1fr 110px;gap:10px;align-items:center;padding:7px 0;font-size:12.5px}
     .hbar-track{background:#f0e9da;border-radius:99px;height:9px;overflow:hidden}
     .hbar-fill{height:100%;border-radius:99px;background:var(--gold)}
-    .hbar-fill.blue{background:var(--blue)}.hbar-fill.green{background:var(--green)}
+    .hbar-fill.blue{background:var(--blue)}.hbar-fill.green{background:var(--green)}.hbar-fill.red{background:var(--red)}
     .hbar-val{color:var(--muted);font-size:11.5px;text-align:left;white-space:nowrap}
     .legend{display:flex;flex-direction:column;gap:9px;font-size:12.5px}
     .legend .li{display:flex;align-items:center;gap:9px}
@@ -1272,9 +1272,80 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         {name:"amount", label:"المبلغ (ج.س)", type:"number", value:init.amount||"", required:true},
         {name:"type", label:"نوع المنصرف", type:"select", options:EXPENSE_TYPES.map(t=>({value:t,label:t})), value:init.type||"متغيرة"},
         {name:"category", label:"التصنيف", type:"select", options:EXPENSE_CATEGORIES.map(c=>({value:c,label:c})), value:init.category||"عام"},
-        {name:"date", label:"تاريخ الانصراف", type:"date", value:init.date||today},
+        {name:"date", label:"تاريخ المنصرف", type:"date", value:normDate(init.date)||today, required:true},
         {name:"notes", label:"ملاحظات", type:"textarea", value:init.notes||""}
       ];
+    }
+    /* ===== تاريخ المنصرف: توحيد الصيغة (YYYY-MM-DD) مهما كانت صيغة الإدخال أو الاستيراد ===== */
+    function normDate(v){
+      if(v===undefined||v===null||v==="") return "";
+      const pad=n=>String(n).padStart(2,"0");
+      if(v instanceof Date) return isNaN(v.getTime())?"":v.getFullYear()+"-"+pad(v.getMonth()+1)+"-"+pad(v.getDate());
+      if(typeof v==="number" && isFinite(v)){ // رقم تسلسلي من Excel
+        const d=new Date(Math.round((v-25569)*86400000));
+        return isNaN(d.getTime())?"":d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());
+      }
+      const s=String(v).trim().replace(/[٠-٩]/g,c=>"٠١٢٣٤٥٦٧٨٩".indexOf(c));
+      let m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+      if(m) return m[1]+"-"+pad(m[2])+"-"+pad(m[3]);
+      m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+      if(m) return m[3]+"-"+pad(m[2])+"-"+pad(m[1]);
+      if(/^\d{5}(\.\d+)?$/.test(s)) return normDate(Number(s));
+      const d=new Date(s);
+      return isNaN(d.getTime())?"":d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+    }
+    function expDate(e){ return normDate(e&&e.date); }
+    function expAmount(e){ return Number(e&&e.amount||0)||0; }
+    /* المنصرفات الواقعة بين تاريخين (شاملة الطرفين) — حسب تاريخ المنصرف نفسه */
+    function expensesBetween(from,to){
+      return expenses.filter(e=>{
+        if(!from && !to) return true;
+        const d=expDate(e);
+        if(!d) return false;
+        return (!from||d>=from)&&(!to||d<=to);
+      });
+    }
+    function sortExpensesByDate(list){
+      return list.slice().sort((a,b)=>(expDate(b)||"").localeCompare(expDate(a)||"") || String(b.id||"").localeCompare(String(a.id||"")));
+    }
+    /* تجميع المنصرفات حسب البند (التصنيف) مع عدد العمليات والمبلغ */
+    function groupExpensesByCategory(list){
+      const m={};
+      list.forEach(e=>{const k=e.category||"أخرى"; m[k]=m[k]||{name:k,count:0,total:0}; m[k].count++; m[k].total+=expAmount(e);});
+      return Object.values(m).sort((a,b)=>b.total-a.total);
+    }
+    /* ===== فلتر صفحة المنصرفات (الفترة الزمنية + البحث + النوع + البند) ===== */
+    const EXP_PERIODS=[["today","اليوم"],["week","آخر 7 أيام"],["month","هذا الشهر"],["lastmonth","الشهر الماضي"],["year","هذه السنة"],["all","كل الفترات"],["custom","فترة مخصصة"]];
+    let expFilter={period:"month",from:"",to:"",q:"",type:"",category:""};
+    function expPeriodRange(){
+      const pad=n=>String(n).padStart(2,"0");
+      const f=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+      const t=new Date(); t.setHours(0,0,0,0);
+      const p=expFilter.period;
+      if(p==="all") return ["",""];
+      if(p==="today") return [f(t),f(t)];
+      if(p==="week"){const s=new Date(t);s.setDate(s.getDate()-6);return [f(s),f(t)];}
+      if(p==="month") return [f(new Date(t.getFullYear(),t.getMonth(),1)),f(new Date(t.getFullYear(),t.getMonth()+1,0))];
+      if(p==="lastmonth") return [f(new Date(t.getFullYear(),t.getMonth()-1,1)),f(new Date(t.getFullYear(),t.getMonth(),0))];
+      if(p==="year") return [t.getFullYear()+"-01-01",t.getFullYear()+"-12-31"];
+      let a=normDate(expFilter.from), b=normDate(expFilter.to);
+      if(a&&b&&a>b){const x=a;a=b;b=x;}
+      return [a,b];
+    }
+    function expPeriodLabel(){
+      const [a,b]=expPeriodRange();
+      if(!a&&!b) return "كل الفترات";
+      if(a&&b) return a===b?date(a):("من "+date(a)+" إلى "+date(b));
+      return a?("من "+date(a)+" فما بعد"):("حتى "+date(b));
+    }
+    function filteredExpenses(){
+      const [a,b]=expPeriodRange();
+      let list=expensesBetween(a,b);
+      const q=(expFilter.q||"").trim().toLowerCase();
+      if(q) list=list.filter(e=>(e.title||"").toLowerCase().includes(q)||(e.notes||"").toLowerCase().includes(q)||(e.category||"").toLowerCase().includes(q));
+      if(expFilter.type) list=list.filter(e=>(e.type||"متغيرة")===expFilter.type);
+      if(expFilter.category) list=list.filter(e=>(e.category||"أخرى")===expFilter.category);
+      return sortExpensesByDate(list);
     }
     function inventoryFields(init){
       return [
@@ -1554,28 +1625,30 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
         
     function renderExpensesTable(list){
-      if(!list.length) return `<div class="empty">لا توجد مصاريف مسجلة مطابقة.</div>`;
+      if(!list.length) return `<div class="empty">لا توجد مصاريف مسجلة في الفترة المحددة.</div>`;
+      const total=list.reduce((s,e)=>s+expAmount(e),0);
       return `<div class="table-wrap">
         <table>
-          <thead><tr><th>التاريخ</th><th>بند المصروف</th><th>النوع</th><th>التصنيف</th><th>المبلغ</th><th>ملاحظات</th><th>إجراءات</th></tr></thead>
+          <thead><tr><th>تاريخ المنصرف</th><th>بند المصروف</th><th>النوع</th><th>التصنيف</th><th>المبلغ</th><th>ملاحظات</th><th>إجراءات</th></tr></thead>
           <tbody>
-            ${list.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(e => `
+            ${sortExpensesByDate(list).map(e => `
               <tr>
-                <td>${date(e.date)}</td>
+                <td>${date(expDate(e))}</td>
                 <td><strong>${esc(e.title)}</strong></td>
-                <td><span class="badge ${e.type==='ثابتة'?'blue':'gold'}">${esc(e.type)}</span></td>
-                <td>${esc(e.category)}</td>
+                <td><span class="badge ${e.type==='ثابتة'?'blue':'gold'}">${esc(e.type||"متغيرة")}</span></td>
+                <td>${esc(e.category||"أخرى")}</td>
                 <td><strong>${displayCost(e.amount)}</strong></td>
                 <td><small class="sub">${esc(e.notes||"-")}</small></td>
                 <td>
                   <div class="button-row">
-                    <button class="secondary" data-action="edit-expense" data-id="${e.id}">تعديل</button>
-                    <button class="danger" data-action="delete-expense" data-id="${e.id}">حذف</button>
+                    <button class="secondary" data-action="edit-expense" data-id="${esc(e.id)}">تعديل</button>
+                    <button class="danger" data-action="delete-expense" data-id="${esc(e.id)}">حذف</button>
                   </div>
                 </td>
               </tr>
             `).join('')}
           </tbody>
+          <tfoot><tr style="background:var(--paper)"><td colspan="4"><strong>إجمالي ${list.length} بند</strong></td><td><strong>${displayCost(total)}</strong></td><td colspan="2"></td></tr></tfoot>
         </table>
       </div>`;
     }
@@ -1632,35 +1705,79 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </div>`;
     }
 
-    function expensesPage(){
-      const totalExp = expenses.reduce((s,e)=>s+Number(e.amount||0),0);
-      const fixedExp = expenses.filter(e=>e.type==='ثابتة').reduce((s,e)=>s+Number(e.amount||0),0);
-      const varExp = expenses.filter(e=>e.type==='متغيرة').reduce((s,e)=>s+Number(e.amount||0),0);
-      const mktExp = expenses.filter(e=>e.category==='تسويق وإعلانات').reduce((s,e)=>s+Number(e.amount||0),0);
-
-      return `<section class="view">
-        <div class="heading">
-          <div><p class="eyebrow">الشؤون المالية</p><h1>سجل المصاريف والمشتريات</h1><p class="sub">تتبع التكاليف الثابتة، المتغيرة، ومشتريات المواد الطبية مع إمكانية تعديل التواريخ.</p></div>
-          <button class="primary" id="addExpenseBtn">＋ تسجيل مصروف جديد</button>
-        </div>
+    /* الجزء المتغير من صفحة المنصرفات (البطاقات + البنود + الجدول) — يُحسب حسب تاريخ المنصرف والفترة المختارة */
+    function expensesDynamic(){
+      const list = filteredExpenses();
+      const sum = arr => arr.reduce((s,e)=>s+expAmount(e),0);
+      const totalExp = sum(list);
+      const fixedExp = sum(list.filter(e=>e.type==='ثابتة'));
+      const varExp = sum(list.filter(e=>(e.type||'متغيرة')==='متغيرة'));
+      const mktExp = sum(list.filter(e=>e.category==='تسويق وإعلانات'));
+      const cats = groupExpensesByCategory(list);
+      const catMax = Math.max(1, ...cats.map(c=>c.total));
+      const label = expPeriodLabel();
+      return `
+        <p class="period-line">📌 الفترة المعروضة: <b>${esc(label)}</b> • <b>${list.length}</b> بند • الإجمالي <b>${displayCost(totalExp)}</b></p>
         <div class="report-cards">
-          ${card("إجمالي المصاريف", displayCost(totalExp), "كافة التكاليف المسجلة", "💸")}
+          ${card("إجمالي المصاريف", displayCost(totalExp), "خلال الفترة المحددة", "💸")}
           ${card("المصاريف الثابتة", displayCost(fixedExp), "إيجار، رواتب، فواتير", "🏢")}
           ${card("المصاريف المتغيرة", displayCost(varExp), "مواد طبية، صيانة، إعلانات", "🧪")}
           ${card("مصاريف التسويق", displayCost(mktExp), "الحملات الإعلانية", "📣")}
         </div>
+        <section class="panel" style="margin-bottom:18px">
+          <div class="panel-head"><div><h2>📊 المنصرفات حسب البند</h2><p>توزيع منصرفات الفترة على البنود — اضغط على البند لعرض عملياته فقط.</p></div></div>
+          <div class="panel-body" style="padding-top:6px">
+            ${cats.length?`<div class="table-wrap"><table>
+              <thead><tr><th>البند</th><th>عدد العمليات</th><th>التوزيع</th><th>المبلغ</th><th>النسبة</th></tr></thead>
+              <tbody>${cats.map(c=>`<tr style="cursor:pointer" data-exp-cat="${esc(c.name)}" title="عرض عمليات هذا البند فقط">
+                <td><strong>${esc(c.name)}</strong>${expFilter.category===c.name?' <span class="badge gold">مُصفّى</span>':''}</td>
+                <td>${c.count}</td>
+                <td><div style="min-width:90px;background:#efe7d5;border-radius:99px;height:9px;overflow:hidden"><div style="width:${Math.max(3,Math.round(c.total/catMax*100))}%;height:100%;background:#c39a3d"></div></div></td>
+                <td><strong>${displayCost(c.total)}</strong></td>
+                <td>${totalExp?Math.round(c.total/totalExp*100):0}%</td>
+              </tr>`).join("")}</tbody>
+              <tfoot><tr style="background:var(--paper)"><td><strong>الإجمالي</strong></td><td><strong>${list.length}</strong></td><td></td><td><strong>${displayCost(totalExp)}</strong></td><td>100%</td></tr></tfoot>
+            </table></div>`:`<div class="empty">لا توجد منصرفات في هذه الفترة.</div>`}
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head"><div><h2>🧾 تفاصيل المنصرفات</h2><p>مرتبة حسب تاريخ المنصرف (الأحدث أولاً).</p></div></div>
+          ${renderExpensesTable(list)}
+        </section>`;
+    }
+
+    function expensesPage(){
+      const [a,b] = expPeriodRange();
+      const catOptions = Array.from(new Set([...EXPENSE_CATEGORIES, ...expenses.map(e=>e.category||"أخرى")]));
+      return `<section class="view">
+        <div class="heading">
+          <div><p class="eyebrow">الشؤون المالية</p><h1>سجل المصاريف والمشتريات</h1><p class="sub">كل الحسابات تتم حسب <b>تاريخ المنصرف</b> — اختر فترة زمنية لرؤية منصرفاتها وإجمالياتها وبنودها.</p></div>
+          <div class="button-row">
+            <button class="secondary" data-action="export-expenses">⬇ تصدير Excel للفترة</button>
+            <button class="primary" id="addExpenseBtn">＋ تسجيل مصروف جديد</button>
+          </div>
+        </div>
+        <div class="report-toolbar" style="position:static">
+          <div class="report-chips" id="expPeriodChips">${EXP_PERIODS.map(([k,l])=>`<button type="button" class="${expFilter.period===k?"active":""}" data-exp-period="${k}">${l}</button>`).join("")}</div>
+          <div class="report-custom" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="sub">من</span><input id="expFrom" type="date" value="${esc(a)}" title="من تاريخ">
+            <span class="sub">إلى</span><input id="expTo" type="date" value="${esc(b)}" title="إلى تاريخ">
+          </div>
+        </div>
         <div class="toolbar">
-          <input id="expenseSearch" placeholder="بحث في بند المصروف أو الملاحظات...">
+          <input id="expenseSearch" placeholder="بحث في بند المصروف أو الملاحظات..." value="${esc(expFilter.q)}">
           <select id="expenseTypeFilter">
             <option value="">جميع الأنواع</option>
-            <option value="ثابتة">مصاريف ثابتة</option>
-            <option value="متغيرة">مصاريف متغيرة</option>
+            <option value="ثابتة" ${expFilter.type==="ثابتة"?"selected":""}>مصاريف ثابتة</option>
+            <option value="متغيرة" ${expFilter.type==="متغيرة"?"selected":""}>مصاريف متغيرة</option>
           </select>
-          <span class="sub" id="expenseCountLabel">${expenses.length} بند مسجل</span>
+          <select id="expenseCatFilter">
+            <option value="">جميع البنود</option>
+            ${catOptions.map(c=>`<option value="${esc(c)}" ${expFilter.category===c?"selected":""}>${esc(c)}</option>`).join("")}
+          </select>
+          <button type="button" class="secondary" id="expResetFilters">مسح الفلاتر</button>
         </div>
-        <section class="panel" id="expensesTableContainer">
-          ${renderExpensesTable(expenses)}
-        </section>
+        <div id="expensesDynamic">${expensesDynamic()}</div>
       </section>`;
     }
 
@@ -1864,7 +1981,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </section>`;
     }
 
-    function patientsPage(){return`<section class="view"><div class="heading"><div><p class="eyebrow">الملفات الرقمية</p><h1>دليل المرضى</h1><p class="sub">ابحث وراجع سجلات المرضى، مع عدد الزيارات لكل مريض.</p></div><button class="primary" data-view="new-patient">＋ ملف مريض جديد</button></div><div class="toolbar"><input id="patientSearch" placeholder="بحث بالاسم أو رقم الملف أو الجوال..."><span class="sub">${patients.length} سجلات محفوظة</span></div><section class="panel" id="table">${patientTable(patients)}</section></section>`}
+    function patientsPage(){return`<section class="view"><div class="heading"><div><p class="eyebrow">الملفات الرقمية</p><h1>دليل المرضى</h1><p class="sub">ابحث وراجع سجلات المرضى، مع عدد الزيارات لكل مريض.</p></div><div class="button-row"><button class="secondary" data-action="export-patients" title="تصدير كل تفاصيل ملفات المرضى (البيانات الشخصية، التاريخ الطبي، الاستبيان، الزيارات، الإجراءات، الخطط العلاجية) إلى ملف Excel">⬇ تصدير ملفات المرضى (Excel)</button><button class="primary" data-view="new-patient">＋ ملف مريض جديد</button></div></div><div class="toolbar"><input id="patientSearch" placeholder="بحث بالاسم أو رقم الملف أو الجوال..."><span class="sub">${patients.length} سجلات محفوظة</span></div><section class="panel" id="table">${patientTable(patients)}</section></section>`}
     
     function patientTable(list){if(!list.length)return`<div class="empty">لا توجد نتائج مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>رقم الملف</th><th>اسم المريض</th><th>الهاتف</th><th>مصدر المعرفة</th><th>عدد الزيارات المتاحة</th><th>آخر زيارة</th><th>إجراءات</th></tr></thead><tbody>${list.map(p=>{const pv=getPatientVisits(p.id);const refStr = Array.isArray(p.referral)?p.referral.join("، "):value(p.referral);return`<tr><td>#${esc(p.file)}</td><td><strong>${value(p.fullName)}</strong></td><td dir="ltr">${value(p.phone)}</td><td><span class="badge blue">${refStr}</span></td><td><span class="badge gold">${pv.length} زيارة</span></td><td>${pv[0]?date(pv[0].date):"لا توجد"}</td><td><div class="button-row">${button("فتح الملف","open-patient",p.id)}${button("تسجيل زيارة","new-visit-for",p.id,"primary")}${button("الخطة العلاجية","treatment-plan",p.id)}${adminUnlocked?button("حذف","delete-patient",p.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
     
@@ -1914,7 +2031,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const a=ymd(sd),b=ymd(ed);
       const vs=getVisibleVisits().filter(v=>(v.date||"")>=a&&(v.date||"")<=b);
       const done=vs.filter(v=>v.status!=="ملغاة");
-      const expList=expenses.filter(x=>(x.date||"")>=a&&(x.date||"")<=b);
+      const expList=sortExpensesByDate(expensesBetween(a,b));
       const labList=labs.filter(l=>(l.date||"")>=a&&(l.date||"")<=b);
       const rev=done.reduce((s,v)=>s+Number(v.cost||0),0);
       const paid=done.reduce((s,v)=>s+Number(v.paid||0),0);
@@ -1941,7 +2058,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const rep=done.filter(v=>v.visitType!=="جديد").length;
       const cancels=vs.filter(v=>v.status==="ملغاة").length;
       const expByCat={};expList.forEach(x=>{const k=x.category||"أخرى";expByCat[k]=(expByCat[k]||0)+Number(x.amount||0)});
-      return{vs,done,rev,paid,due,exp,expByCat,labList,labCost,days,svc,doc,chair,shift,daily,debtors,src,newP,rep,cancels,net:paid-exp,avgInvoice:done.length?rev/done.length:0,cancelRate:vs.length?cancels/vs.length*100:0,visitsPerDay:vs.length/days};
+      return{vs,done,rev,paid,due,exp,expByCat,expList,expCats:groupExpensesByCategory(expList),labList,labCost,days,svc,doc,chair,shift,daily,debtors,src,newP,rep,cancels,net:paid-exp,avgInvoice:done.length?rev/done.length:0,cancelRate:vs.length?cancels/vs.length*100:0,visitsPerDay:vs.length/days};
     }
 
     /* ===== مكوّنات الرسم (SVG/DOM خالص — بلا مكتبات خارجية) ===== */
@@ -2009,6 +2126,29 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
 
     /* ===== تبويب لوحة القرار التفاعلية ===== */
+    /* ===== لوحة بنود المنصرفات في التقارير (حسب تاريخ المنصرف داخل الفترة) ===== */
+    function expensesReportPanel(cur,prev){
+      const cats=cur.expCats||[], items=cur.expList||[];
+      const prevCat={}; if(prev&&prev.expCats) prev.expCats.forEach(c=>prevCat[c.name]=c.total);
+      const catTable=cats.length?`<div class="table-wrap"><table>
+          <thead><tr><th>بند المنصرف</th><th>العمليات</th><th>المبلغ</th><th>النسبة</th>${prev?"<th>الفترة السابقة</th>":""}</tr></thead>
+          <tbody>${cats.map(c=>`<tr><td><strong>${esc(c.name)}</strong></td><td>${c.count}</td><td class="num"><strong>${money(c.total)}</strong></td><td>${cur.exp?Math.round(c.total/cur.exp*100):0}%</td>${prev?`<td class="num" style="color:var(--muted)">${money(prevCat[c.name]||0)}</td>`:""}</tr>`).join("")}</tbody>
+          <tfoot><tr style="background:var(--paper)"><td><strong>الإجمالي</strong></td><td><strong>${items.length}</strong></td><td class="num"><strong>${money(cur.exp)}</strong></td><td>100%</td>${prev?`<td class="num" style="color:var(--muted)">${money(prev.exp)}</td>`:""}</tr></tfoot>
+        </table></div>`:`<div class="empty">لا توجد منصرفات مسجلة بتاريخ داخل هذه الفترة.</div>`;
+      const itemTable=items.length?`<div class="table-wrap" style="max-height:420px;overflow:auto"><table>
+          <thead><tr><th>التاريخ</th><th>بند المصروف</th><th>التصنيف</th><th>النوع</th><th>المبلغ</th><th>ملاحظات</th></tr></thead>
+          <tbody>${items.map(e=>`<tr><td>${date(expDate(e))}</td><td><strong>${esc(e.title)}</strong></td><td>${esc(e.category||"أخرى")}</td><td><span class="badge ${e.type==='ثابتة'?'blue':'gold'}">${esc(e.type||"متغيرة")}</span></td><td class="num"><strong>${money(expAmount(e))}</strong></td><td><small class="sub">${esc(e.notes||"—")}</small></td></tr>`).join("")}</tbody>
+        </table></div>`:`<div class="empty">لا توجد عمليات صرف في هذه الفترة.</div>`;
+      return `<section class="panel"><div class="panel-head"><div><h2>💸 بنود المنصرفات خلال الفترة</h2><p>إجمالي <b>${money(cur.exp)}</b> في <b>${items.length}</b> عملية صرف — محسوبة حسب تاريخ المنصرف.</p></div><button class="secondary" data-view="expenses">فتح سجل المصاريف ←</button></div>
+        <div class="panel-body" style="padding:14px 20px">
+          ${cats.length?hbarsRow(cats.slice(0,10).map(c=>[c.name,c.total,money(c.total)+" / "+c.count+" عملية"]),"red"):""}
+          <div class="rgrid" style="margin:14px 0 0">
+            <div><h3 style="font-size:14px;margin:0 0 8px">حسب البند</h3>${catTable}</div>
+            <div><h3 style="font-size:14px;margin:0 0 8px">تفاصيل عمليات الصرف</h3>${itemTable}</div>
+          </div>
+        </div></section>`;
+    }
+
     function renderDashReport(cur,prev){
       const dd=(v,p)=>prev?pctDelta(v,p):null;
       const lowItems=inventory.filter(i=>Number(i.qty)<=Number(i.minQty));
@@ -2068,6 +2208,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         <section class="panel"><div class="panel-head"><div><h2>💸 أكبر المدينين (أولوية التحصيل)</h2><p>مرتّبون بالمبلغ + عمر الدين — ابدأ بالأقدم والأكبر.</p></div></div>
           <div class="panel-body" style="padding-top:6px">${debtorsRows?`<div class="table-wrap"><table><thead><tr><th>المريض</th><th>المتبقي</th><th>الفواتير</th><th>عمر الدين</th></tr></thead><tbody>${debtorsRows}</tbody></table></div>`:`<div class="empty">لا ديون في هذه الفترة 🎉</div>`}</div></section>
       </div>
+
+      ${expensesReportPanel(cur,prev)}
 
       <section class="panel"><div class="panel-head"><div><h2>🧭 التوصيات — محسوبة من أرقام هذه الفترة بالذات</h2><p>لا نصوص ثابتة: كل توصية تتغير تلقائياً حسب بيانات العيادة</p></div></div>
         <div class="panel-body"><div class="recs">${recs.map(r=>`<div class="rec"><b>${r[0]}</b>${r[1]}</div>`).join("")||`<div class="empty">لا توصيات حالياً — سجّل زيارات لتظهر التوصيات.</div>`}</div></div></section>
@@ -2143,20 +2285,29 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <tr><td><strong>الصافي (المحصّل − المصاريف)</strong></td><td style="color:${c.net>=0?"var(--green)":"var(--red)"}"><strong>${money(c.net)}</strong></td><td></td></tr>
           </tbody></table>
         </div>
-        <div class="rep-sec"><h3>٦. النشاط العلاجي (أعلى الخدمات)</h3>
+        <div class="rep-sec"><h3>٦. تفصيل بنود المنصرفات</h3>
+          <table><thead><tr><th>بند المنصرف (التصنيف)</th><th>عدد العمليات</th><th>المبلغ</th><th>النسبة</th></tr></thead><tbody>
+          ${(c.expCats||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${r.count}</td><td><strong>${money(r.total)}</strong></td><td>${c.exp?Math.round(r.total/c.exp*100):0}%</td></tr>`).join("")||`<tr><td colspan="4" style="color:var(--muted)">لا منصرفات بالفترة</td></tr>`}
+          ${(c.expCats||[]).length?`<tr><td><strong>الإجمالي</strong></td><td><strong>${c.expList.length}</strong></td><td><strong>${money(c.exp)}</strong></td><td>100%</td></tr>`:""}
+          </tbody></table>
+          ${c.expList.length?`<table style="margin-top:10px"><thead><tr><th>التاريخ</th><th>وصف المنصرف</th><th>التصنيف</th><th>النوع</th><th>المبلغ</th><th>ملاحظات</th></tr></thead><tbody>
+          ${c.expList.map(x=>`<tr><td>${date(expDate(x))}</td><td>${esc(x.title)}</td><td>${esc(x.category||"أخرى")}</td><td>${esc(x.type||"متغيرة")}</td><td><strong>${money(expAmount(x))}</strong></td><td>${esc(x.notes||"—")}</td></tr>`).join("")}
+          </tbody></table>`:""}
+        </div>
+        <div class="rep-sec"><h3>٧. النشاط العلاجي (أعلى الخدمات)</h3>
           ${svc.length?`<table><thead><tr><th>الخدمة</th><th>عدد المرات</th><th>الإيراد</th><th>المتوسط</th></tr></thead><tbody>
           ${svc.slice(0,10).map(r=>`<tr><td>${esc(r.name)}</td><td>${r.count}</td><td><strong>${money(r.total)}</strong></td><td>${money(r.total/r.count)}</td></tr>`).join("")}
           </tbody></table>`:`<ul><li style="color:var(--muted);list-style:none;margin-right:-20px">لا خدمات منفذة بالفترة</li></ul>`}
         </div>
-        <div class="rep-sec"><h3>٧. حركة المرضى وقنوات الاستقطاب</h3>
+        <div class="rep-sec"><h3>٨. حركة المرضى وقنوات الاستقطاب</h3>
           <table><thead><tr><th>القناة (الاسم الموحد)</th><th>عدد المرضى</th><th>النسبة</th></tr></thead><tbody>
           ${Object.entries(c.src).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td><td>${Math.round(v/srcTotal*100)}%</td></tr>`).join("")||`<tr><td colspan="3" style="color:var(--muted)">لا بيانات بالفترة</td></tr>`}
           </tbody></table>
         </div>
-        <div class="rep-sec"><h3>٨. أبرز الملاحظات والتوصيات</h3>
+        <div class="rep-sec"><h3>٩. أبرز الملاحظات والتوصيات</h3>
           <ul>${recs.map(r=>`<li><b>${r[0].replace(/^[^ ]+ /,"")}:</b> ${r[1].replace(/<[^>]+>/g,"")}</li>`).join("")||`<li style="color:var(--muted);list-style:none;margin-right:-20px">لا ملاحظات</li>`}</ul>
         </div>
-        <div class="rep-sec"><h3>٩. ${NARR_TABS[3][1].substring(2)}</h3><ul id="sheet-nextTasks">${bullets(n.nextTasks)}</ul></div>
+        <div class="rep-sec"><h3>١٠. ${NARR_TABS[3][1].substring(2)}</h3><ul id="sheet-nextTasks">${bullets(n.nextTasks)}</ul></div>
         <div class="rep-sign"><span>توقيع مدير العيادة: ..........................</span><span>أُعدّ آلياً من نظام عيادة أوراس</span></div>
       </div>`;
     }
@@ -2204,6 +2355,133 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </section>`;
     }
 
+    /* ===== أدوات مشتركة لملفات Excel: اتجاه من اليمين لليسار + عرض أعمدة مناسب + حفظ متوافق مع WebView2 ===== */
+    function xlsxSheet(rows, widths){
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      const cols=(rows[0]||[]).map((_,i)=>{
+        if(widths&&widths[i]) return {wch:widths[i]};
+        let mx=8; rows.slice(0,300).forEach(r=>{const v=r&&r[i]; if(v!==undefined&&v!==null){const l=String(v).split("\n").reduce((m,x)=>Math.max(m,x.length),0); if(l>mx) mx=l;}});
+        return {wch:Math.min(60,mx+2)};
+      });
+      ws["!cols"]=cols;
+      if(rows.length>1 && rows[0] && rows[0].length) ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length-1,c:rows[0].length-1}})};
+      return ws;
+    }
+    async function saveWorkbook(wb, filename){
+      wb.Workbook=wb.Workbook||{}; wb.Workbook.Views=[{RTL:true}];
+      const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+      const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      return await saveBlob(blob, filename, blob.type);
+    }
+    const xjoin = v => Array.isArray(v) ? v.filter(x=>x!==undefined&&x!==null&&String(x).trim()!=="").join("، ") : (v===undefined||v===null ? "" : String(v));
+    const xnum = v => { const n=Number(v); return isFinite(n) ? n : 0; };
+
+    /* ===== تصدير ملفات المرضى إلى Excel — كل تفاصيل الملف المرضي ===== */
+    async function exportPatientsExcel(list, baseName){
+      try{
+        if(typeof XLSX==="undefined"||!XLSX.utils){message("مكتبة Excel غير متاحة حالياً.");return}
+        list=(list||[]).filter(Boolean);
+        if(!list.length){message("لا توجد ملفات مرضى لتصديرها.");return}
+        const sorted=list.slice().sort((a,b)=>(Number(a.file)||0)-(Number(b.file)||0) || String(a.file||"").localeCompare(String(b.file||"")));
+        const ids=new Set(sorted.map(p=>p.id));
+        const allVisits=getVisibleVisits().filter(v=>ids.has(v.patientId));
+        const visitsOf=id=>allVisits.filter(v=>v.patientId===id).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+        const plansOf=id=>treatmentPlans.filter(t=>t&&t.patientId===id).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+        const procNames=v=>{const it=(Array.isArray(v.items)&&v.items.length)?v.items:[]; return it.length?it.map(i=>i.procedure).filter(Boolean).join("، "):(v.procedure||v.treatment||"");};
+        const medsTxt=p=>{const a=Array.isArray(p.meds)?p.meds:(p.meds?[p.meds]:(p.medications?["نعم"]:[]));return a.includes("نعم")?"نعم":(a.includes("لا")?"لا":"");};
+        const planSummary=pl=>PLAN_TYPES.map((t,i)=>{const c=(pl.cols||[])[i]||{};const parts=[];if(String(c.count||"").trim())parts.push("العدد: "+c.count);if(String(c.done||"").trim())parts.push("المنجز: "+c.done);if(String(c.position||"").trim())parts.push("الموضع: "+c.position);if(String(c.notes||"").trim())parts.push(c.notes);return parts.length?t+" ("+parts.join(" - ")+")":"";}).filter(Boolean).join(" | ");
+
+        const KNOWN=["id","file","fullName","age","phone","occupation","address","gender","marital","conditions","medNotes","meds","medications","allergies","allergyOther","women","habits","referral","time","reason","service","created"];
+        const extraKeys=[];
+        sorted.forEach(p=>Object.keys(p).forEach(k=>{if(!KNOWN.includes(k)&&!extraKeys.includes(k)&&!k.startsWith("_")&&(typeof p[k]!=="object"||Array.isArray(p[k])))extraKeys.push(k)}));
+
+        // 1) ملفات المرضى
+        const pHead=["رقم الملف","اسم المريض","العمر","الجنس","الحالة الاجتماعية","رقم الواتساب / الجوال","المهنة","العنوان","تاريخ فتح الملف",
+          "الأمراض المزمنة","ملاحظات التاريخ الطبي","أدوية حالياً","اسم الدواء","الحساسية","حساسية أخرى","للنساء","العادات",
+          "كيف عرف العيادة","الوقت المفضل للزيارة","سبب اختيار العيادة","نوع الخدمة المطلوبة",
+          "عدد الزيارات","تاريخ أول زيارة","تاريخ آخر زيارة","آخر طبيب معالج","آخر شكوى","آخر تشخيص","الإجراءات المنفذة",
+          "إجمالي قيمة العلاج","إجمالي المدفوع","إجمالي المتبقي (دين)","عدد الخطط العلاجية","آخر خطة علاجية (تاريخ)","تفاصيل آخر خطة علاجية","نصائح وإرشادات الخطة",...extraKeys];
+        const pRows=[pHead];
+        sorted.forEach(p=>{
+          const pv=visitsOf(p.id), done=pv.filter(v=>v.status!=="ملغاة"), pl=plansOf(p.id), last=pv[pv.length-1], lastPlan=pl[pl.length-1];
+          const procs=Array.from(new Set(done.map(procNames).join("، ").split("، ").map(x=>x.trim()).filter(Boolean))).join("، ");
+          pRows.push([
+            String(p.file??""), p.fullName||"", p.age!==undefined&&p.age!==""&&!isNaN(Number(p.age))?Number(p.age):(p.age||""), xjoin(p.gender), xjoin(p.marital), String(p.phone??""), p.occupation||"", p.address||"", normDate(p.created)||"",
+            xjoin(p.conditions), p.medNotes||"", medsTxt(p), p.medications||"", xjoin(p.allergies), p.allergyOther||"", xjoin(p.women), xjoin(p.habits),
+            xjoin(Array.isArray(p.referral)?dedupeChannels(p.referral):p.referral), xjoin(p.time), xjoin(p.reason), xjoin(p.service),
+            pv.length, pv[0]?normDate(pv[0].date):"", last?normDate(last.date):"", last?(last.doctor||""):"", last?(last.mainComplaint||""):"", last?(last.diagnosis||""):"", procs,
+            done.reduce((s,v)=>s+xnum(v.cost),0), done.reduce((s,v)=>s+xnum(v.paid),0), done.reduce((s,v)=>s+xnum(v.due),0),
+            pl.length, lastPlan?normDate(lastPlan.date):"", lastPlan?planSummary(lastPlan):"", lastPlan?(lastPlan.advice||""):"",
+            ...extraKeys.map(k=>xjoin(p[k]))
+          ]);
+        });
+
+        // 2) الزيارات
+        const fileOf=id=>{const p=getPatient(id);return p?String(p.file??""):""};
+        const nameOf=v=>{const p=getPatient(v.patientId);return p?p.fullName:(v.patientName||"")};
+        const vRows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","إجمالي المبلغ","المدفوع","المتبقي (دين)","حالة الزيارة"]];
+        sorted.forEach(p=>visitsOf(p.id).forEach((v,i)=>vRows.push([
+          fileOf(v.patientId), nameOf(v), v.visitNum||String(i+1), normDate(v.date)||"", v.shift||"", v.visitType||"", v.doctor||"", v.chair||"", v.mainComplaint||"", v.diagnosis||"",
+          (Array.isArray(v.items)&&v.items.length)?v.items.filter(it=>it&&it.procedure).map(it=>it.procedure+" ("+xnum(it.cost).toLocaleString("en")+")").join("، "):(v.procedure||v.treatment||""),
+          v.planWorked||"", xnum(v.cost), xnum(v.paid), xnum(v.due), v.status||"مكتملة"
+        ])));
+
+        // 3) الإجراءات التفصيلية
+        const iRows=[["رقم الملف","اسم المريض","تاريخ الزيارة","الطبيب المعالج","الإجراء","التكلفة"]];
+        sorted.forEach(p=>visitsOf(p.id).forEach(v=>{
+          if(v.status==="ملغاة") return;
+          const it=(Array.isArray(v.items)&&v.items.length)?v.items:[{procedure:v.procedure||v.treatment||"",cost:v.cost}];
+          it.forEach(x=>{if(x&&x.procedure)iRows.push([fileOf(v.patientId),nameOf(v),normDate(v.date)||"",v.doctor||"",x.procedure,xnum(x.cost)])});
+        }));
+
+        // 4) الخطط العلاجية
+        const tRows=[["رقم الملف","اسم المريض","تاريخ الخطة","نوع العلاج","العدد المخطط","المنجز","الموضع / رقم السن","ملاحظات","نصائح وإرشادات","تم إعلام المريض","تم شرح الخطة","تم عرض الخطة","توقيع الطبيب","توقيع المريض"]];
+        const yn=b=>b?"نعم":"لا";
+        sorted.forEach(p=>plansOf(p.id).forEach(pl=>{
+          let any=false;
+          PLAN_TYPES.forEach((t,i)=>{const c=(pl.cols||[])[i]||{};
+            if(!(String(c.count||"").trim()||String(c.done||"").trim()||String(c.position||"").trim()||String(c.notes||"").trim()))return;
+            any=true;
+            tRows.push([String(p.file??""),p.fullName||"",normDate(pl.date)||"",t,c.count||"",c.done||"",c.position||"",c.notes||"",pl.advice||"",yn(pl.informed),yn(pl.explained),yn(pl.planShown),pl.doctorSign||"",pl.patientSign||""]);
+          });
+          if(!any) tRows.push([String(p.file??""),p.fullName||"",normDate(pl.date)||"","—","","","","",pl.advice||"",yn(pl.informed),yn(pl.explained),yn(pl.planShown),pl.doctorSign||"",pl.patientSign||""]);
+        }));
+
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,xlsxSheet(pRows),"ملفات المرضى");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet(vRows),"الزيارات");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet(iRows),"الإجراءات التفصيلية");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet(tRows),"الخطط العلاجية");
+        const ok=await saveWorkbook(wb,(baseName||"ملفات-المرضى")+"-"+today+".xlsx");
+        if(ok) message("تم تصدير "+sorted.length+" ملف مريض إلى Excel (ملفات المرضى، الزيارات، الإجراءات، الخطط العلاجية).");
+      }catch(err){console.error(err);message("تعذر التصدير: "+(err&&err.message||err))}
+    }
+
+    /* ===== تصدير منصرفات الفترة المختارة في صفحة المصاريف ===== */
+    async function exportExpensesExcel(){
+      try{
+        if(typeof XLSX==="undefined"||!XLSX.utils){message("مكتبة Excel غير متاحة حالياً.");return}
+        const list=filteredExpenses();
+        if(!list.length){message("لا توجد منصرفات في الفترة المحددة لتصديرها.");return}
+        const total=list.reduce((s,e)=>s+expAmount(e),0);
+        const cats=groupExpensesByCategory(list);
+        const [a,b]=expPeriodRange();
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,xlsxSheet([
+          ["تاريخ المنصرف","بند المصروف","التصنيف","النوع","المبلغ","ملاحظات"],
+          ...list.map(e=>[expDate(e),e.title||"",e.category||"أخرى",e.type||"متغيرة",expAmount(e),e.notes||""]),
+          [],["","الإجمالي","","",total,""]
+        ]),"المنصرفات");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet([
+          ["البند","عدد العمليات","المبلغ","النسبة %"],
+          ...cats.map(c=>[c.name,c.count,c.total,total?Math.round(c.total/total*1000)/10:0]),
+          [],["الإجمالي",list.length,total,100]
+        ]),"حسب البند");
+        const ok=await saveWorkbook(wb,"المنصرفات-"+(a||"البداية")+"_الى_"+(b||"الآن")+".xlsx");
+        if(ok) message("تم تصدير منصرفات الفترة إلى Excel.");
+      }catch(err){console.error(err);message("تعذر التصدير: "+(err&&err.message||err))}
+    }
+
     /* ===== تصدير Excel (بمكتبة XLSX الموجودة في النظام) ===== */
     function exportReportExcel(){
       try{
@@ -2232,7 +2510,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         const svc=Object.entries(c.svc).map(([n,d])=>({name:n,count:d.n,total:d.total})).sort((a,b)=>b.total-a.total);
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["الخدمة","عدد المرات","الإيراد","المتوسط"],...svc.map(r=>[r.name,r.count,R(r.total),R(r.total/r.count)])]),"الخدمات");
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["المريض","المتبقي","عدد الفواتير","أقدم فاتورة"],...Object.entries(c.debtors).sort((a,b)=>b[1].amt-a[1].amt).map(([n,d])=>[n,R(d.amt),d.n,d.oldest])]),"الديون");
-        XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["بند المصروف","المبلغ"],...Object.entries(c.expByCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,R(v)])]),"المصاريف");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet([["بند المصروف","عدد العمليات","المبلغ","النسبة %"],...(c.expCats||[]).map(r=>[r.name,r.count,R(r.total),c.exp?Math.round(r.total/c.exp*1000)/10:0]),[],["الإجمالي",c.expList.length,R(c.exp),100]]),"المصاريف حسب البند");
+        XLSX.utils.book_append_sheet(wb,xlsxSheet([["تاريخ المنصرف","بند المصروف","التصنيف","النوع","المبلغ","ملاحظات"],...c.expList.map(x=>[expDate(x),x.title||"",x.category||"أخرى",x.type||"متغيرة",R(expAmount(x)),x.notes||""]),[],["","الإجمالي","","",R(c.exp),""]]),"تفاصيل المنصرفات");
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["قناة المعرفة","عدد المرضى"],...Object.entries(c.src).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v])]),"قنوات المعرفة");
         XLSX.writeFile(wb,"تقرير-"+ymd(s)+"_الى_"+ymd(e)+".xlsx");
         message("تم تصدير التقرير بصيغة Excel.");
@@ -2263,7 +2542,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function buildComprehensivePrint(){
       const {from, to, inRange} = reportPeriodRange();
       const visits = getVisibleVisits().filter(v=>inRange(v.date));
-      const expP = expenses.filter(e=>inRange(e.date));
+      const expP = expenses.filter(e=>{const d=expDate(e); return !!d && inRange(d);});
       const labsP = labs.filter(l=>inRange(l.date));
 
       const totalRev = visits.reduce((s,v)=>s+Number(v.cost||0),0);
@@ -2284,7 +2563,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       expP.forEach(e=>{ const c=e.category||"أخرى"; catMap[c]=catMap[c]||{count:0,total:0}; catMap[c].count++; catMap[c].total+=Number(e.amount||0); });
       const catRows = Object.keys(catMap).map(k=>({name:k,...catMap[k]})).sort((a,b)=>b.total-a.total);
       const catMax = Math.max(1, ...catRows.map(r=>r.total));
-      const expSorted = expP.slice().sort((a,b)=>(a.category||"").localeCompare(b.category||"") || (a.date||"").localeCompare(b.date||""));
+      const expSorted = expP.slice().sort((a,b)=>(a.category||"").localeCompare(b.category||"") || expDate(a).localeCompare(expDate(b)));
 
       const docMap = {};
       visits.forEach(v=>{ const d=v.doctor||"د. عثمان"; docMap[d]=docMap[d]||{count:0,total:0}; docMap[d].count++; docMap[d].total+=Number(v.cost||0); });
@@ -2313,7 +2592,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         return `<tr><td><strong>${esc(r.name)}</strong></td><td>${r.count}</td><td><div style="min-width:80px;background:#efe7d5;border-radius:99px;height:9px;overflow:hidden"><div style="width:${barPct}%;height:100%;background:#c39a3d"></div></div></td><td><strong>${money(r.total)}</strong></td><td>${totalExp ? Math.round((r.total/totalExp)*100)+"%" : "0%"}</td></tr>`;
       }).join("") : `<tr><td colspan="5" style="text-align:center;color:#766f65">لا توجد مصروفات مسجلة في هذه الفترة.</td></tr>`;
 
-      const expItemsHtml = expSorted.length ? expSorted.map(e=>`<tr><td><strong>${esc(e.title)}</strong></td><td>${esc(e.category||"عام")}</td><td>${badge(e.type||"متغيرة", e.type==="ثابتة"?"blue":"gold")}</td><td>${date(e.date)}</td><td>${esc(e.notes||"—")}</td><td><strong>${money(e.amount)}</strong></td></tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:#766f65">لا توجد بنود مصروفات مسجلة.</td></tr>`;
+      const expItemsHtml = expSorted.length ? expSorted.map(e=>`<tr><td><strong>${esc(e.title)}</strong></td><td>${esc(e.category||"عام")}</td><td>${badge(e.type||"متغيرة", e.type==="ثابتة"?"blue":"gold")}</td><td>${date(expDate(e))}</td><td>${esc(e.notes||"—")}</td><td><strong>${money(e.amount)}</strong></td></tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:#766f65">لا توجد بنود مصروفات مسجلة.</td></tr>`;
 
       const labsRows = labsP.length ? labsP.map(l=>`<tr><td><strong>${esc(l.labName)}</strong></td><td>${esc(l.patientName)}</td><td>${esc(l.toothNumber||"—")}</td><td>${esc(l.workType||"—")}</td><td>${badge(l.status||"—", l.status==="تم الاستلام"?"green":(l.status==="ملغى"?"red":"gold"))}</td><td>${badge(l.rating||"—","blue")}</td><td>${date(l.date)}</td><td><strong>${money(l.cost)}</strong></td></tr>`).join("") : `<tr><td colspan="8" style="text-align:center;color:#766f65">لا توجد طلبات معمل مسجلة.</td></tr>`;
 
@@ -2456,7 +2735,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const prefix = `${year}-${mm}`;
       const monthVisits = visits.filter(v=>(v.date||"").startsWith(prefix));
       const monthPatients = patients.filter(p=>(p.created||"").startsWith(prefix));
-      const monthExpenses = expenses.filter(e=>(e.date||"").startsWith(prefix));
+      const monthExpenses = expenses.filter(e=>expDate(e).startsWith(prefix));
 
       const workDaysSet = new Set(monthVisits.map(v=>v.date));
       const workDays = workDaysSet.size;
@@ -2726,6 +3005,27 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </div>`;
     }
 
+    /* تفصيل المنصرفات في التقرير الشهري: البنود المعتمدة في التقرير + عمليات الصرف الفعلية بتاريخ ذلك الشهر */
+    function monthlyExpensesBlock(r){
+      const rows=(r.expenseBreakdown||[]).filter(x=>x&&String(x.label||"").trim()&&Number(x.amount||0)>0);
+      const tot=rows.reduce((s,x)=>s+Number(x.amount||0),0);
+      const prefix=`${r.year}-${String(r.month||1).padStart(2,"0")}`;
+      const items=sortExpensesByDate(expenses.filter(e=>expDate(e).startsWith(prefix)));
+      const itot=items.reduce((s,e)=>s+expAmount(e),0);
+      return `<h3 style="color:var(--gold-dark);margin-top:26px">البند الرابع: تفصيل المنصرفات</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>بند المنصرف</th><th>المبلغ</th><th>النسبة</th></tr></thead>
+          <tbody>${rows.map(x=>`<tr><td>${esc(x.label)}</td><td><strong>${money(x.amount)}</strong></td><td>${tot?Math.round(Number(x.amount)/tot*100):0}%</td></tr>`).join("")||`<tr><td colspan="3" style="color:var(--muted)">لا توجد بنود منصرفات مسجلة في التقرير</td></tr>`}
+          ${rows.length?`<tr><td><strong>الإجمالي</strong></td><td><strong>${money(tot)}</strong></td><td>100%</td></tr>`:""}</tbody>
+        </table></div>
+        ${items.length?`<h3 style="font-size:14px;margin-top:16px">عمليات الصرف المسجلة خلال الشهر (${items.length})</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>التاريخ</th><th>وصف المنصرف</th><th>التصنيف</th><th>النوع</th><th>المبلغ</th></tr></thead>
+          <tbody>${items.map(e=>`<tr><td>${date(expDate(e))}</td><td>${esc(e.title)}</td><td>${esc(e.category||"أخرى")}</td><td>${esc(e.type||"متغيرة")}</td><td><strong>${money(expAmount(e))}</strong></td></tr>`).join("")}
+          <tr><td colspan="4"><strong>الإجمالي</strong></td><td><strong>${money(itot)}</strong></td></tr></tbody>
+        </table></div>`:""}`;
+    }
+
     function monthlyReportPrintable(r){
       if(!r) return `<div class="empty">لم يتم العثور على التقرير.</div>`;
       const f = r.financial||{}, o = r.operational||{};
@@ -2787,6 +3087,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             <tr><td>متوسط فاتورة الفرد</td><td><strong>${money(f.avgInvoice)}</strong></td></tr>
           </tbody>
         </table></div>
+
+        ${monthlyExpensesBlock(r)}
 
       </section>`;
     }
@@ -2861,6 +3163,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div class="button-row">
             <button class="secondary" data-view="patients">← رجوع لدليل المرضى</button>
             <button class="secondary" data-action="edit-patient" data-id="${p.id}">تعديل الملف</button>
+            <button class="secondary" data-action="export-patient" data-id="${esc(p.id)}" title="تصدير الملف المرضي كاملاً إلى Excel">⬇ تصدير الملف (Excel)</button>
             <button class="secondary" data-action="treatment-plan" data-id="${p.id}">الخطة العلاجية</button>
             <button class="primary" data-action="new-visit-for" data-id="${p.id}">＋ تسجيل زيارة</button>
           </div>
@@ -3697,11 +4000,12 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
 
       document.getElementById("patientSearch")?.addEventListener("input", e=>{
         const q = e.target.value.trim().toLowerCase();
-        const filtered = patients.filter(p=>p.fullName.toLowerCase().includes(q) || p.file.includes(q) || p.phone.includes(q));
+        const filtered = patients.filter(p=>String(p.fullName||"").toLowerCase().includes(q) || String(p.file||"").includes(q) || String(p.phone||"").includes(q));
         const t = document.getElementById("table");
         if(t) t.innerHTML = patientTable(filtered);
       });
 
+      bindExpenseFilters();
       document.getElementById("visitSearch")?.addEventListener("input", filterVisitsUI);
       document.getElementById("visitDate")?.addEventListener("change", filterVisitsUI);
 
@@ -3719,15 +4023,46 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
 
     function filterExpensesUI(){
-      const q = document.getElementById("expenseSearch")?.value.trim().toLowerCase()||"";
-      const type = document.getElementById("expenseTypeFilter")?.value||"";
-      let list = expenses;
-      if(q) list = list.filter(e => (e.title||"").toLowerCase().includes(q) || (e.notes||"").toLowerCase().includes(q) || (e.category||"").toLowerCase().includes(q));
-      if(type) list = list.filter(e => e.type === type);
-      const cont = document.getElementById("expensesTableContainer");
-      if(cont) cont.innerHTML = renderExpensesTable(list);
-      const lbl = document.getElementById("expenseCountLabel");
-      if(lbl) lbl.textContent = list.length + " بند مسجل";
+      const dyn = document.getElementById("expensesDynamic");
+      if(dyn) dyn.innerHTML = expensesDynamic();
+      document.querySelectorAll("#expPeriodChips [data-exp-period]").forEach(b=>b.classList.toggle("active", b.dataset.expPeriod===expFilter.period));
+      const [a,b] = expPeriodRange();
+      const f=document.getElementById("expFrom"), t=document.getElementById("expTo");
+      if(f && document.activeElement!==f) f.value=a;
+      if(t && document.activeElement!==t) t.value=b;
+      const cs=document.getElementById("expenseCatFilter"); if(cs) cs.value=expFilter.category||"";
+    }
+    function bindExpenseFilters(){
+      const root=document.getElementById("expensesDynamic");
+      if(!root) return;
+      document.querySelectorAll("#expPeriodChips [data-exp-period]").forEach(btn=>btn.addEventListener("click",()=>{
+        const k=btn.dataset.expPeriod;
+        if(k==="custom"){ const [a,b]=expPeriodRange(); expFilter.from=a||today; expFilter.to=b||today; }
+        expFilter.period=k; filterExpensesUI();
+      }));
+      const onRange=()=>{
+        expFilter.from=document.getElementById("expFrom")?.value||"";
+        expFilter.to=document.getElementById("expTo")?.value||"";
+        expFilter.period="custom"; filterExpensesUI();
+      };
+      document.getElementById("expFrom")?.addEventListener("change",onRange);
+      document.getElementById("expTo")?.addEventListener("change",onRange);
+      document.getElementById("expenseSearch")?.addEventListener("input",e=>{expFilter.q=e.target.value;filterExpensesUI();});
+      document.getElementById("expenseTypeFilter")?.addEventListener("change",e=>{expFilter.type=e.target.value;filterExpensesUI();});
+      document.getElementById("expenseCatFilter")?.addEventListener("change",e=>{expFilter.category=e.target.value;filterExpensesUI();});
+      document.getElementById("expResetFilters")?.addEventListener("click",()=>{
+        expFilter={period:"month",from:"",to:"",q:"",type:"",category:""};
+        const q=document.getElementById("expenseSearch"); if(q) q.value="";
+        const t=document.getElementById("expenseTypeFilter"); if(t) t.value="";
+        filterExpensesUI();
+      });
+      root.addEventListener("click",e=>{
+        const row=e.target.closest("[data-exp-cat]");
+        if(!row || e.target.closest("button")) return;
+        const c=row.dataset.expCat;
+        expFilter.category = expFilter.category===c ? "" : c;
+        filterExpensesUI();
+      });
     }
 
     function filterInventoryUI(){
@@ -3810,10 +4145,11 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       document.getElementById("addExpenseBtn")?.addEventListener("click", async ()=>{
         const data = await showAppModal({title:"تسجيل مصروف جديد", submitLabel:"تسجيل المصروف", fields: expenseFields({})});
         if(!data) return;
-        expenses.push({id:uid("e"), title:data.title, amount:Number(data.amount||0), type:data.type||"متغيرة", category:data.category||"عام", date:data.date||today, notes:data.notes||""});
+        expenses.push({id:uid("e"), title:data.title, amount:Number(data.amount||0), type:data.type||"متغيرة", category:data.category||"عام", date:normDate(data.date)||today, notes:data.notes||""});
         save();
         render();
-        message("تم تسجيل المصروف.");
+        const [ea,eb]=expPeriodRange(), nd=normDate(data.date)||today;
+        message((ea&&nd<ea)||(eb&&nd>eb) ? "تم تسجيل المصروف — تاريخه ("+date(nd)+") خارج الفترة المعروضة حالياً." : "تم تسجيل المصروف.");
       });
 
       document.getElementById("addInvBtn")?.addEventListener("click", async ()=>{
@@ -3967,7 +4303,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           if(ex){
             const data = await showAppModal({title:"تعديل المصروف", submitLabel:"حفظ التعديلات", fields: expenseFields(ex)});
             if(!data) return;
-            Object.assign(ex, {title:data.title, amount:Number(data.amount||0), type:data.type||ex.type, category:data.category||ex.category, date:data.date||ex.date, notes:data.notes||""});
+            Object.assign(ex, {title:data.title, amount:Number(data.amount||0), type:data.type||ex.type, category:data.category||ex.category, date:normDate(data.date)||normDate(ex.date)||today, notes:data.notes||""});
             save();
             render();
             message("تم تعديل المصروف.");
@@ -4038,6 +4374,15 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           else window.print();
         } else if(act==="export-report"){
           exportReportExcel();
+        } else if(act==="export-expenses"){
+          exportExpensesExcel();
+        } else if(act==="export-patients"){
+          const q=(document.getElementById("patientSearch")?.value||"").trim().toLowerCase();
+          const list=q?patients.filter(p=>String(p.fullName||"").toLowerCase().includes(q)||String(p.file||"").includes(q)||String(p.phone||"").includes(q)):patients;
+          exportPatientsExcel(list, q?"ملفات-المرضى-نتائج-البحث":"ملفات-المرضى-كاملة");
+        } else if(act==="export-patient"){
+          const pt=getPatient(id);
+          if(pt) exportPatientsExcel([pt], "ملف-المريض-"+String(pt.file||"")+"-"+String(pt.fullName||"").replace(/[\\/:*?"<>|]+/g,"").trim());
         } else if(act==="print-comprehensive"){
           printComprehensiveReport();
         } else if(act==="backup"){
