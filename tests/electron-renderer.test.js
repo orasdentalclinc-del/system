@@ -35,8 +35,8 @@ before(async () => {
         const data = JSON.parse(body);
         let value = null;
         switch (data.operation) {
-          case 'status': value={ok:true,exists:service.store.exists()}; break;
-          case 'unlock': value={ok:true,...service.store.open(data.passphrase)}; break;
+          case 'status': value={ok:true,exists:service.store.exists(),canRemember:true}; break;
+          case 'unlock': value={ok:true,...service.store.open(data.passphrase),automatic:true}; break;
           case 'get':
             if (service.failGetKey === data.key) throw Object.assign(new Error('injected read failure'), {code:'INJECTED'});
             value = service.store.getItem(data.key); break;
@@ -340,4 +340,42 @@ test('file-loaded desktop page has local libraries and Web Crypto without writin
   await page.evaluate(()=>{const doc=new jspdf.jsPDF();doc.text('test',20,20);doc.save('test.pdf');});
   const pdf=await fsp.readFile(await (await downloading).path());
   assert.equal(pdf.subarray(0,4).toString(),'%PDF');
+});
+
+test('unlock screen warns if Windows cannot protect the key and still uses encrypted storage', async t => {
+  const context=await browser.newContext();t.after(()=>context.close());
+  await context.addInitScript(()=>{
+    if(location.protocol!=='http:') return;
+    window.electronAPI={
+      databaseStatus:async()=>({ok:true,exists:true,canRemember:false}),
+      unlockDatabase:async()=>({ok:true,automatic:false,autoMessage:'تعذّر حفظ مفتاح التشفير بحماية Windows.'}),
+      enterClinic:()=>{window.__entered=true;}
+    };
+  });
+  const page=await context.newPage(), messages=[];
+  page.on('dialog',async dialog=>{messages.push(dialog.message());await dialog.accept();});
+  await page.goto(baseURL+'/unlock.html');
+  await page.locator('#unlockForm').waitFor({state:'visible'});
+  assert.match(await page.locator('#description').textContent(),/غير متاح/);
+  await page.locator('#passphrase').fill(PASS);
+  await page.locator('#unlockForm button').click();
+  await page.waitForFunction(()=>window.__entered===true);
+  assert.ok(messages.some(text=>text.includes('تعذّر حفظ مفتاح التشفير')));
+});
+
+test('unlock screen blocks creating an empty database when the old database is missing', async t => {
+  const context=await browser.newContext();t.after(()=>context.close());
+  await context.addInitScript(()=>{
+    if(location.protocol!=='http:') return;
+    window.electronAPI={
+      databaseStatus:async()=>({ok:true,exists:false,blocked:true,message:'ملف قاعدة البيانات المتوقع مفقود. لم ننشئ قاعدة فارغة.'}),
+      unlockDatabase:async()=>{window.__unexpectedUnlock=true;return {ok:true};},
+      enterClinic:()=>{}
+    };
+  });
+  const page=await context.newPage();await page.goto(baseURL+'/unlock.html');
+  await page.waitForFunction(()=>document.querySelector('#title')?.textContent.includes('مفقود'));
+  assert.match(await page.locator('#description').textContent(),/لم ننشئ قاعدة فارغة/);
+  assert.equal(await page.locator('#unlockForm').isHidden(),true);
+  assert.equal(await page.evaluate(()=>window.__unexpectedUnlock),undefined);
 });

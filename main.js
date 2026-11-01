@@ -1,17 +1,22 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell, safeStorage } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { EncryptedStore } = require('./secure-database');
 const { registerClinicIpc, sameLocalPage } = require('./electron-ipc');
+const { WindowsKeyVault, attemptAutomaticUnlock } = require('./key-vault');
 
 const indexPath = path.join(__dirname, 'index.html');
 const unlockPath = path.join(__dirname, 'unlock.html');
 let win = null;
 let store = null;
+let keyVault = null;
+let automaticUnlock = { opened: false, state: 'NEW_DATABASE' };
 
 function createWindow() {
+  // Runs only after app.whenReady(), as required by Electron safeStorage.
+  automaticUnlock = attemptAutomaticUnlock(store, keyVault);
   const options = {
     width: 1366,
     height: 768,
@@ -38,7 +43,7 @@ function createWindow() {
     win = null;
     try { store?.close(); } catch { /* retain files for recovery */ }
   });
-  win.loadFile(unlockPath);
+  win.loadFile(automaticUnlock.opened ? indexPath : unlockPath);
 }
 
 // A single application window/process avoids concurrent writers and makes
@@ -55,8 +60,11 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
-    store = new EncryptedStore(path.join(app.getPath('userData'), 'clinic-data', 'oras-dental.sqlite3'));
-    registerClinicIpc({ ipcMain, store, getWindow: () => win, dialog, shell, app, indexPath, unlockPath });
+    const dataDir = path.join(app.getPath('userData'), 'clinic-data');
+    store = new EncryptedStore(path.join(dataDir, 'oras-dental.sqlite3'));
+    keyVault = new WindowsKeyVault(path.join(dataDir, 'oras-dental-key.dpapi'), safeStorage);
+    registerClinicIpc({ ipcMain, store, keyVault, getAutomaticUnlock: () => automaticUnlock,
+      getWindow: () => win, dialog, shell, app, indexPath, unlockPath });
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

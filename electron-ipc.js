@@ -11,7 +11,7 @@ function sameLocalPage(url, pagePath) {
   } catch { return false; }
 }
 
-function registerClinicIpc({ ipcMain, store, getWindow, dialog, shell, app, indexPath, unlockPath }) {
+function registerClinicIpc({ ipcMain, store, keyVault, getAutomaticUnlock, getWindow, dialog, shell, app, indexPath, unlockPath }) {
   function trusted(event, pagePath) {
     const win = getWindow();
     const frame = event.senderFrame;
@@ -33,14 +33,39 @@ function registerClinicIpc({ ipcMain, store, getWindow, dialog, shell, app, inde
 
   ipcMain.handle('oras:database-status', event => {
     if (!trusted(event, unlockPath)) return denied();
-    return { ok: true, exists: store.exists() };
+    const exists = store.exists();
+    const automatic = getAutomaticUnlock();
+    if (!exists && (keyVault.exists() || automatic.state !== 'NEW_DATABASE')) {
+      return { ok: true, exists: false, blocked: true,
+        message: 'ملف قاعدة البيانات المتوقع مفقود. لم ننشئ قاعدة فارغة؛ أعد ملف البيانات أو استعد نسخة احتياطية.' };
+    }
+    const message = automatic.state === 'FAILED'
+      ? 'تعذّر الفتح التلقائي. أدخل عبارة التشفير الأصلية للتحقق؛ لم تُحذف البيانات.'
+      : automatic.state === 'UNAVAILABLE'
+        ? 'حماية Windows للمفتاح غير متاحة الآن. أدخل العبارة لفتح قاعدة البيانات يدوياً.'
+        : '';
+    return { ok: true, exists, blocked: false, canRemember: keyVault.available(), message };
   });
 
   ipcMain.handle('oras:unlock', (event, passphrase) => {
     if (!trusted(event, unlockPath)) return denied();
     try {
-      const result = store.open(passphrase);
-      return { ok: true, created: result.created };
+      const existed = store.exists();
+      const keyExists = keyVault.exists();
+      const expectedDatabase = getAutomaticUnlock().state !== 'NEW_DATABASE';
+      if (!existed && (keyExists || expectedDatabase)) {
+        throw new StoreError('DATABASE_MISSING', 'ملف قاعدة البيانات المتوقع مفقود. لم تُنشأ قاعدة جديدة؛ استعد البيانات أولاً.');
+      }
+      // Never replace the saved key unless the entered phrase really opens
+      // this database. The DB remains encrypted even if DPAPI is unavailable.
+      // If an existing file disappears between these checks and opening it,
+      // mustExist also prevents silently creating an empty database.
+      const result = store.open(passphrase, { mustExist: existed || keyExists || expectedDatabase });
+      let automatic = false;
+      try { keyVault.save(passphrase); automatic = true; }
+      catch { /* Keep the database open, report that the key was not saved. */ }
+      return { ok: true, created: result.created, automatic,
+        autoMessage: automatic ? '' : 'تعذّر حفظ مفتاح التشفير بحماية Windows. فُتحت القاعدة المشفّرة، لكن قد تحتاج إلى إدخال العبارة عند التشغيل القادم.' };
     } catch (err) {
       return failure(err, 'تعذّر فتح قاعدة البيانات. تحقق من صلاحيات المجلد ومساحة القرص. لم تُستبدل البيانات.');
     }

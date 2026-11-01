@@ -14,14 +14,23 @@
     if (!api || typeof api.databaseStatus !== 'function') throw new Error('التطبيق غير مهيّأ لفتح التخزين المشفّر.');
     const status = await api.databaseStatus();
     if (!status?.ok) throw new Error(status?.message || 'تعذّر التحقق من قاعدة البيانات.');
+    if (status.blocked) {
+      title.textContent = 'ملف قاعدة البيانات مفقود';
+      description.textContent = status.message || 'لم تُنشأ قاعدة بيانات جديدة. استعد ملف البيانات أولاً.';
+      return;
+    }
     creating = !status.exists;
     if (creating) {
       title.textContent = 'إنشاء قاعدة بيانات مشفّرة';
-      description.textContent = 'اختر عبارة قوية من 12 حرفاً على الأقل. ستستخدمها في كل مرة تفتح فيها النظام.';
+      description.textContent = status.canRemember
+        ? 'اختر عبارة قوية من 12 حرفاً على الأقل. سيحفظها Windows محمية لفتح القاعدة تلقائياً لاحقاً.'
+        : 'اختر عبارة قوية من 12 حرفاً على الأقل. الفتح التلقائي غير متاح حالياً، وقد تحتاج لإدخالها عند كل تشغيل.';
       document.getElementById('newDatabaseFields').classList.remove('hidden');
       button.textContent = 'إنشاء وفتح النظام';
     } else {
-      description.textContent = 'أدخل عبارة التشفير التي اخترتها عند إنشاء قاعدة البيانات على هذا الجهاز.';
+      description.textContent = status.message || (status.canRemember
+        ? 'أدخل عبارة التشفير الأصلية مرة واحدة لتفعيل الفتح التلقائي على حساب Windows هذا.'
+        : 'أدخل عبارة التشفير الأصلية لفتح قاعدة البيانات. الفتح التلقائي غير متاح حالياً.');
     }
     form.classList.remove('hidden');
     passphrase.focus();
@@ -57,6 +66,7 @@
       }
       passphrase.value = '';
       confirmation.value = '';
+      if (!result.automatic) alert(result.autoMessage || 'تعذّر تفعيل الفتح التلقائي؛ قد تُطلب عبارة التشفير عند التشغيل القادم.');
       api.enterClinic();
     } catch {
       error.textContent = 'تعذّر فتح قاعدة البيانات. لم تُحذف البيانات.';

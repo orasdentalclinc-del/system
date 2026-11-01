@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const appFiles = new Set([
-  'package.json', 'main.js', 'preload.js', 'electron-ipc.js', 'secure-database.js',
+  'package.json', 'main.js', 'preload.js', 'electron-ipc.js', 'secure-database.js', 'key-vault.js',
   'index.html', 'unlock.html', 'unlock.js', 'icon.ico', 'vendor', 'node_modules'
 ]);
 const vendorFiles = new Set([
@@ -29,7 +29,7 @@ function ignoreUnneeded(file) {
 async function main() {
   const root = path.resolve(__dirname, '..');
   for (const name of ['index.html', 'unlock.html', 'unlock.js', 'main.js', 'preload.js', 'electron-ipc.js', 'secure-database.js',
-    'vendor/html2canvas.min.js', 'vendor/jspdf.umd.min.js', 'vendor/xlsx.mini.min.js',
+    'key-vault.js', 'vendor/html2canvas.min.js', 'vendor/jspdf.umd.min.js', 'vendor/xlsx.mini.min.js',
     'node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-x64.node']) {
     if (!fs.existsSync(path.join(root, name))) throw new Error(`Missing required file: ${name}. Run npm ci in the complete project.`);
   }

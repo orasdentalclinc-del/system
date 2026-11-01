@@ -123,12 +123,15 @@ test('IPC accepts only the application main frame and exposes only the intended 
   const win = { webContents: wc, isDestroyed: () => false, loadFile: file => { frame.url = pathToFileURL(file).href; } };
   const event = { sender: wc, senderFrame: frame };
   const backup = path.join(dir, 'picked.orasdb');
-  registerClinicIpc({ ipcMain, store: db, getWindow: () => win,
+  let remembered = null;
+  const keyVault = { exists:()=>remembered!==null, available:()=>true, save:value=>{remembered=value;} };
+  registerClinicIpc({ ipcMain, store: db, keyVault, getAutomaticUnlock:()=>({state:'NEW_DATABASE'}), getWindow: () => win,
     dialog: { showSaveDialog: async () => ({ canceled: false, filePath: backup }) },
     shell: { openExternal: url => { opened.push(url); return Promise.resolve(); } },
     app: { getPath: () => dir }, indexPath: index, unlockPath: unlock });
-  assert.deepEqual(handlers.get('oras:database-status')(event), { ok: true, exists: false });
-  assert.equal(handlers.get('oras:unlock')(event, PASS).ok, true);
+  assert.deepEqual(handlers.get('oras:database-status')(event), { ok: true, exists: false, blocked:false, canRemember:true, message:'' });
+  assert.deepEqual(handlers.get('oras:unlock')(event, PASS), { ok:true, created:true, automatic:true, autoMessage:'' });
+  assert.equal(remembered,PASS);
   listeners.get('oras:enter-clinic')(event);
   assert.equal(frame.url, pathToFileURL(index).href);
   listeners.get('oras:storage')(event, { operation: 'set', key: PATIENTS, value: 'secret' });
@@ -176,7 +179,7 @@ test('preload presents a fixed bridge, propagates errors, and does not expose ge
 });
 
 test('Windows build whitelist includes app resources but excludes local patient exports and backups', () => {
-  for (const file of ['', '/index.html', '/unlock.js', '/vendor/xlsx.mini.min.js', '/node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-x64.node']) {
+  for (const file of ['', '/index.html', '/unlock.js', '/key-vault.js', '/vendor/xlsx.mini.min.js', '/node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-x64.node']) {
     assert.equal(ignoreUnneeded(file), false, file);
   }
   for (const file of ['/clinic-backup.json', '/secret.orasdb', '/patient.xlsx', '/.git', '/tests', '/vendor/secret.json', '/node_modules/.bin']) {
@@ -189,7 +192,7 @@ test('Electron Packager filter keeps the native database dependency and offline 
   const filterModule = pathToFileURL(path.join(root, 'node_modules/@electron/packager/dist/copy-filter.js')).href;
   const { userPathFilter } = await import(filterModule);
   const filter = userPathFilter({dir:root, out:path.join(root,'dist'), prune:true, ignore:ignoreUnneeded});
-  for (const file of ['index.html','main.js','preload.js','unlock.html','vendor','vendor/xlsx.mini.min.js',
+  for (const file of ['index.html','main.js','preload.js','unlock.html','key-vault.js','vendor','vendor/xlsx.mini.min.js',
     'node_modules/better-sqlite3-multiple-ciphers', 'node_modules/node-addon-api',
     'node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-x64.node']) {
     assert.equal(await filter(path.join(root,file)), true, `Expected ${file} in package`);

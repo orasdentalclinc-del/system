@@ -76,9 +76,12 @@ class EncryptedStore {
     return fs.existsSync(this.filename);
   }
 
-  open(passphrase) {
+  open(passphrase, { mustExist = false } = {}) {
     if (this.db) throw new StoreError('ALREADY_OPEN', 'قاعدة البيانات مفتوحة بالفعل.');
     const creating = !this.exists();
+    if (mustExist && creating) {
+      throw new StoreError('DATABASE_MISSING', 'ملف قاعدة البيانات مفقود. لم تُنشأ قاعدة جديدة؛ استعد البيانات أولاً.');
+    }
     validatePassphrase(passphrase, creating);
     let db;
     let created = false;

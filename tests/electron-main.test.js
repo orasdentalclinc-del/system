@@ -10,8 +10,8 @@ const { pathToFileURL } = require('node:url');
 const { sameLocalPage } = require('../electron-ipc');
 
 const root = path.resolve(__dirname, '..');
-async function startMockMain(lock) {
-  const windows = [], stores = [], registrations = [];
+async function startMockMain(lock, automatic = {opened:false,state:'KEY_MISSING'}) {
+  const windows = [], stores = [], vaults = [], registrations = [];
   class FakeApp extends EventEmitter {
     constructor() { super(); this.quitCalled = false; }
     requestSingleInstanceLock() { return lock; }
@@ -32,7 +32,8 @@ async function startMockMain(lock) {
     constructor(filename) { this.filename=filename; stores.push(this); }
     close() { this.closed=true; }
   }
-  const electron = { app, BrowserWindow:FakeWindow, Menu:{setApplicationMenu:()=>{}},
+  class FakeVault { constructor(filename) { this.filename=filename; vaults.push(this); } }
+  const electron = { app, BrowserWindow:FakeWindow, Menu:{setApplicationMenu:()=>{}}, safeStorage:{},
     ipcMain:{}, dialog:{showErrorBox:()=>{}}, shell:{} };
   const code = fs.readFileSync(path.join(root,'main.js'),'utf8');
   vm.runInNewContext(code, {
@@ -40,21 +41,23 @@ async function startMockMain(lock) {
     require(id) {
       if(id==='electron') return electron;
       if(id==='./secure-database') return {EncryptedStore:FakeStore};
+      if(id==='./key-vault') return {WindowsKeyVault:FakeVault,attemptAutomaticUnlock:()=>automatic};
       if(id==='./electron-ipc') return {registerClinicIpc: options=>registrations.push(options),sameLocalPage};
       return require(id);
     }
   });
   await new Promise(resolve=>setImmediate(resolve));
-  return {app,windows,stores,registrations};
+  return {app,windows,stores,vaults,registrations};
 }
 
-test('main process loads unlock first with isolation and retains the original app identity', async () => {
-  const {app,windows,stores,registrations}=await startMockMain(true);
+test('main process shows setup when no saved key exists and retains the original app identity', async () => {
+  const {app,windows,stores,vaults,registrations}=await startMockMain(true);
   assert.equal(require('../package.json').name,'oras-dental-clinic');
   assert.equal(windows.length,1); assert.equal(registrations.length,1);
   const win=windows[0];
   assert.equal(win.loaded,path.join(root,'unlock.html'));
   assert.equal(stores[0].filename,path.join(root,'fake-userdata','clinic-data','oras-dental.sqlite3'));
+  assert.equal(vaults[0].filename,path.join(root,'fake-userdata','clinic-data','oras-dental-key.dpapi'));
   assert.equal(win.options.webPreferences.nodeIntegration,false);
   assert.equal(win.options.webPreferences.contextIsolation,true);
   assert.equal(win.options.webPreferences.sandbox,true);
@@ -68,6 +71,12 @@ test('main process loads unlock first with isolation and retains the original ap
   assert.equal(denied,false);
   app.emit('second-instance'); assert.equal(win.focused,true);
   win.emit('closed'); assert.equal(stores[0].closed,true);
+});
+
+test('main process opens the clinic directly when the protected key unlocks the database', async () => {
+  const {windows,registrations}=await startMockMain(true,{opened:true,state:'OPENED'});
+  assert.equal(windows[0].loaded,path.join(root,'index.html'));
+  assert.equal(registrations[0].getAutomaticUnlock().state,'OPENED');
 });
 
 test('a second instance exits without opening a database or window', async () => {
