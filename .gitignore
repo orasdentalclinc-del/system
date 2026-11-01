@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+test-results/
+
+.venv/
+dist/
+*.orasdb
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.dpapi
