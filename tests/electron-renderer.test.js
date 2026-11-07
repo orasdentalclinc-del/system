@@ -379,3 +379,61 @@ test('unlock screen blocks creating an empty database when the old database is m
   assert.equal(await page.locator('#unlockForm').isHidden(),true);
   assert.equal(await page.evaluate(()=>window.__unexpectedUnlock),undefined);
 });
+
+test('exchange rates and visit discounts persist in the encrypted database and backup', async t => {
+  const PRICING='oras-dental-pricing-v1', PROCEDURES='oras-dental-procedures-v1';
+  const {context,service}=await createEnvironment(t);
+  const page=await context.newPage(); await page.goto(baseURL); await login(page);
+  await createPatient(page,'Encrypted discount patient',321);
+  await page.locator('.sidebar [data-view="settings"]').click();
+  await page.locator('#usdExchangeRate').fill('2500');
+  await page.locator('.proc-usd-input').first().fill('10');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('تم حفظ سعر الصرف'));
+  assert.equal(JSON.parse(service.store.getItem(PRICING))[0].rate,2500);
+  assert.equal(JSON.parse(service.store.getItem(PROCEDURES))[0].cost,25000);
+  assert.equal(await page.evaluate(k=>localStorage.getItem(k),PRICING),null);
+  await page.locator('.sidebar [data-view="patients"]').click();
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  await page.locator('#vDiscountType').selectOption('percent');
+  await page.locator('#vDiscountValue').fill('20');
+  await page.locator('#vPaid').fill('5000');
+  assert.equal(await page.locator('#vDue').inputValue(),'15000');
+  await page.locator('#vForm button[type="submit"]').click();
+  await page.locator('#vForm').waitFor({state:'detached'});
+  const saved=JSON.parse(service.store.getItem(VISITS))[0];
+  assert.deepEqual([saved.discountAmount,saved.cost,saved.paid,saved.due],[5000,20000,5000,15000]);
+  await page.locator('.sidebar [data-view="settings"]').click();
+  await page.locator('[data-action="backup-encrypted"]').click();
+  await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('تم حفظ نسخة احتياطية'));
+  const backup=new EncryptedStore(service.backup); backup.open(PASS);
+  assert.equal(JSON.parse(backup.getItem(PRICING))[0].rate,2500);
+  assert.equal(JSON.parse(backup.getItem(VISITS))[0].discountAmount,5000);
+  backup.close();
+  service.store.close(); service.store=new EncryptedStore(service.filename); service.store.open(PASS);
+  await page.reload(); await login(page);
+  await page.locator('.sidebar [data-view="settings"]').click();
+  assert.equal(await page.locator('#usdExchangeRate').inputValue(),'2500');
+  assert.equal(await page.locator('.proc-usd-input').first().inputValue(),'10');
+});
+
+test('rate and converted prices roll back together on a database failure and can be retried', async t => {
+  const PRICING='oras-dental-pricing-v1', PROCEDURES='oras-dental-procedures-v1';
+  const {context,service}=await createEnvironment(t);
+  const page=await context.newPage(); await page.goto(baseURL); await login(page);
+  service.store.db.exec(`CREATE TRIGGER reject_pricing BEFORE INSERT ON clinic_storage
+    WHEN NEW.key='${PRICING}' BEGIN SELECT RAISE(ABORT, 'pricing failure'); END;`);
+  await page.locator('.sidebar [data-view="settings"]').click();
+  await page.locator('#usdExchangeRate').fill('2000');
+  await page.locator('.proc-usd-input').first().fill('10');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(()=>hasUnsavedStorageChanges && savesInProgress===0);
+  assert.equal(service.store.getItem(PRICING),null);
+  assert.equal(service.store.getItem(PROCEDURES),null,'procedure update must roll back with the exchange rate');
+  assert.match(await page.locator('#storageWarning').textContent(),/تعذّر حفظ البيانات/);
+  service.store.db.exec('DROP TRIGGER reject_pricing');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(()=>!hasUnsavedStorageChanges && document.querySelector('#toast')?.textContent.includes('تم حفظ سعر الصرف'));
+  assert.equal(JSON.parse(service.store.getItem(PRICING))[0].rate,2000);
+  assert.equal(JSON.parse(service.store.getItem(PROCEDURES))[0].cost,20000);
+});

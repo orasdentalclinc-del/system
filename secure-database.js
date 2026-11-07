@@ -9,7 +9,7 @@ const Database = require('better-sqlite3-multiple-ciphers');
 // before any of them has been saved in the encrypted database.
 const CLINICAL_KEYS = Object.freeze([
   'oras-dental-patients-v3', 'oras-dental-visits-v3',
-  'oras-dental-procedures-v1', 'oras-dental-lists-v1',
+  'oras-dental-procedures-v1', 'oras-dental-pricing-v1', 'oras-dental-lists-v1',
   'oras-dental-expenses-v1', 'oras-dental-inv-v1', 'oras-dental-labs-v1',
   'oras-dental-monthly-reports-v1', 'oras-dental-report-narratives-v1',
   'oras-dental-treatment-plans-v1', 'oras-dental-admin-v1',

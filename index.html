@@ -685,9 +685,9 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       : window.__orasStorageVolatile ? window.__orasFallbackStorage : window.localStorage;
     const PATIENTS_KEY="oras-dental-patients-v3", VISITS_KEY="oras-dental-visits-v3", ADMIN_KEY="oras-dental-admin-v1", PROCEDURES_KEY="oras-dental-procedures-v1", LISTS_KEY="oras-dental-lists-v1", EXPENSES_KEY="oras-dental-expenses-v1", INVENTORY_KEY="oras-dental-inv-v1", LABS_KEY="oras-dental-labs-v1", SERVER_IP_KEY="oras-dental-server-ip", MONTHLY_KEY="oras-dental-monthly-reports-v1", NARRATIVES_KEY="oras-dental-report-narratives-v1", PLANS_KEY="oras-dental-treatment-plans-v1";
     /* ===== حماية البيانات من الفقدان (إصلاح مشكلة اختفاء ملفات المرضى) ===== */
-    const BACKUP_KEY="oras-dental-autobackup-v1", RECOVERY_KEY="oras-dental-before-restore-v1";
-    const FORM_VIEWS=["new-patient","edit-patient","new-visit","new-appointment","edit-visit","treatment-plan"];
-    let pendingExternalUpdate=false, pendingNotice="";
+    const BACKUP_KEY="oras-dental-autobackup-v1", RECOVERY_KEY="oras-dental-before-restore-v1", PRICING_KEY="oras-dental-pricing-v1";
+    const FORM_VIEWS=["new-patient","edit-patient","new-visit","new-appointment","edit-visit","treatment-plan","settings"];
+    let pendingExternalUpdate=false, pendingNotice="", pricingFormOrigin=null, pricingPendingSave=false, pricingFormDirty=false;
     const earlyDataWarnings=[];
     const corruptDataKeys=new Set();
     const ARABIC_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -695,7 +695,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     const MORNING_PASS_KEY="oras-dental-morning-pass-v1", EVENING_PASS_KEY="oras-dental-evening-pass-v1", MANAGER_PASS_KEY="oras-dental-manager-pass-v1";
     const DEFAULT_ROLE_PASSWORDS={morning:"morning2026",evening:"evening2026",manager:"manager2026"};
     const LEGACY_MIGRATION_KEY="oras-dental-legacy-migrated-v1";
-    const LEGACY_CLINICAL_KEYS=[PATIENTS_KEY,VISITS_KEY,PROCEDURES_KEY,LISTS_KEY,EXPENSES_KEY,INVENTORY_KEY,LABS_KEY,MONTHLY_KEY,NARRATIVES_KEY,PLANS_KEY,ADMIN_KEY,"oras-dental-data-v1"];
+    const LEGACY_CLINICAL_KEYS=[PATIENTS_KEY,VISITS_KEY,PROCEDURES_KEY,PRICING_KEY,LISTS_KEY,EXPENSES_KEY,INVENTORY_KEY,LABS_KEY,MONTHLY_KEY,NARRATIVES_KEY,PLANS_KEY,ADMIN_KEY,"oras-dental-data-v1"];
 
     function legacyStorageEntries(){
       // Read only: the previous Electron localStorage remains untouched unless
@@ -817,6 +817,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     let patients=load(PATIENTS_KEY,seedPatients), 
         visits=load(VISITS_KEY,seedVisits), 
         procedures=load(PROCEDURES_KEY,seedProcedures),
+        pricing=load(PRICING_KEY,[]),
         customLists=load(LISTS_KEY,seedLists),
         expenses=load(EXPENSES_KEY,seedExpenses),
         inventory=load(INVENTORY_KEY,seedInventory),
@@ -856,7 +857,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         try{ clinicStorage.setItem(key+".corrupt."+Date.now(), raw); }catch(_){}
         try{
           const snap=readBackupSnapshot();
-          const map={[PATIENTS_KEY]:"patients",[VISITS_KEY]:"visits",[PROCEDURES_KEY]:"procedures",[LISTS_KEY]:"customLists",[EXPENSES_KEY]:"expenses",[INVENTORY_KEY]:"inventory",[LABS_KEY]:"labs",[PLANS_KEY]:"treatmentPlans",[MONTHLY_KEY]:"monthlyReports"};
+          const map={[PATIENTS_KEY]:"patients",[VISITS_KEY]:"visits",[PROCEDURES_KEY]:"procedures",[PRICING_KEY]:"pricing",[LISTS_KEY]:"customLists",[EXPENSES_KEY]:"expenses",[INVENTORY_KEY]:"inventory",[LABS_KEY]:"labs",[PLANS_KEY]:"treatmentPlans",[MONTHLY_KEY]:"monthlyReports"};
           const bk=(snap&&snap.data&&Array.isArray(snap.data[map[key]]))?sanitizeImported(snap.data[map[key]],"bk"):null;
           if(bk){
             earlyDataWarnings.push("تم اكتشاف بيانات تالفة واسترجاعها تلقائيًا من النسخة الاحتياطية — يُنصح بتنزيل نسخة احتياطية جديدة فورًا.");
@@ -889,6 +890,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         {key:PATIENTS_KEY, name:"patients", get:()=>patients, set:v=>patients=v},
         {key:VISITS_KEY, name:"visits", get:()=>visits, set:v=>visits=v},
         {key:PROCEDURES_KEY, name:"procedures", get:()=>procedures, set:v=>procedures=v},
+        {key:PRICING_KEY, name:"pricing", get:()=>pricing, set:v=>pricing=v},
         {key:LISTS_KEY, name:"customLists", get:()=>customLists, set:v=>customLists=v},
         {key:EXPENSES_KEY, name:"expenses", get:()=>expenses, set:v=>expenses=v},
         {key:INVENTORY_KEY, name:"inventory", get:()=>inventory, set:v=>inventory=v},
@@ -918,6 +920,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       if(corruptDataKeys.size) return "⚠️ توجد بيانات تالفة في التخزين. تم الاحتفاظ بالنسخة التلقائية المتاحة؛ نزّل نسخة احتياطية وافحص البيانات أو استعد نسخة سليمة.";
       if(window.__orasStorageVolatile) return "⚠️ التخزين غير متاح: البيانات مؤقتة وستضيع عند إغلاق الصفحة. نزّل نسخة احتياطية قبل الإغلاق واستخدم متصفحاً يسمح بالتخزين المحلي.";
       if(window.__orasStorageReadOnly) return "⚠️ التخزين ممتلئ أو للقراءة فقط. لم يتم إخفاء البيانات الموجودة، لكن الحفظ قد يفشل. نزّل نسخة احتياطية وافحص مساحة الجهاز.";
+      if(pricingConfigurationInvalid()) return "⚠️ بعض أسعار الدولار لا تملك سعر صرف صالحاً. يعرض النظام آخر سعر محفوظ بالجنيه؛ راجع إعدادات الأسعار قبل تسجيل الزيارات.";
       return "";
     }
     // Merge changes by record ID; simultaneous edits/deletes of the same record
@@ -1115,7 +1118,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function snapshotCurrentData(reason,key=BACKUP_KEY){
       try{
         clinicStorage.setItem(key, JSON.stringify({t:Date.now(), reason:reason||"auto",
-          data:{patients,visits,procedures,customLists,expenses,inventory,labs,treatmentPlans,monthlyReports,narratives:narrativesForSnapshot()}}));
+          data:{patients,visits,procedures,pricing,customLists,expenses,inventory,labs,treatmentPlans,monthlyReports,narratives:narrativesForSnapshot()}}));
         return !window.__orasStorageVolatile;
       }catch(e){ return false; }
     }
@@ -1149,7 +1152,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           seen.add(String(r.id));
         });
       };
-      [patients,visits,treatmentPlans,procedures,expenses,inventory,labs,customLists,monthlyReports].forEach(fix);
+      [patients,visits,treatmentPlans,procedures,pricing,expenses,inventory,labs,customLists,monthlyReports].forEach(fix);
       customLists.forEach(list=>{ if(Array.isArray(list.items)) fix(list.items); });
       if(fixed>0){
         earlyDataWarnings.push("تم إصلاح "+fixed+" من معرّفات السجلات أو روابطها لحماية البيانات.");
@@ -1244,6 +1247,46 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
     function isCompletedVisit(v){ return v && v.status!=="ملغاة" && v.status!=="محجوزة"; }
     function visitPatientName(v){ return getPatient(v.patientId)?.fullName || v.patientName || ""; }
+    function visitRawItems(v){
+      if(Array.isArray(v?.items) && v.items.length) return v.items;
+      const discount=Number(v?.discountAmount??0), net=Number(v?.cost??0), savedGross=Number(v?.grossCost);
+      const hasGross=v?.grossCost!==undefined && v.grossCost!==null && v.grossCost!=="" && validMoney(savedGross);
+      const gross=hasGross ? savedGross : validMoney(net) && validMoney(discount) ? net+discount : (v?.cost||0);
+      return [{procedure:v?.procedure||v?.treatment||"",cost:gross}];
+    }
+    function visitExplicitDiscount(v){
+      const n=Number(v?.discountAmount??0);
+      return validMoney(n) ? roundMoney(n) : 0;
+    }
+    function visitManualReduction(v){
+      // Only recorded snapshots can establish an earlier catalogue price.
+      // Never infer old discounts from today's catalogue or exchange rate.
+      return roundMoney(visitRawItems(v).reduce((sum,it)=>{
+        if(it?.catalogPrice===undefined || it.catalogPrice===null || it.catalogPrice==="" || it.cost===undefined || it.cost===null || it.cost==="") return sum;
+        const catalogue=Number(it.catalogPrice), charged=Number(it.cost);
+        return validMoney(catalogue) && validMoney(charged) ? sum+Math.max(0,catalogue-charged) : sum;
+      },0));
+    }
+    function visitTotalDiscount(v){ return roundMoney(visitExplicitDiscount(v)+visitManualReduction(v)); }
+    function visitNetItems(v){
+      // Apportion the visit-wide discount proportionally using whole cents, so
+      // service reports add up to the visit's net charge without double counting.
+      const items=visitRawItems(v), discount=visitExplicitDiscount(v);
+      const weights=items.map(it=>{const n=Number(it?.cost); return validMoney(n)?n:0;});
+      const gross=roundMoney(weights.reduce((sum,n)=>sum+n,0));
+      if(!gross) return items.map(it=>({...it,cost:0}));
+      const target=Math.round(Math.max(0,roundMoney(gross-Math.min(discount,gross)))*100);
+      const weightTotal=weights.reduce((sum,n)=>sum+n,0);
+      const parts=weights.map((weight,index)=>{
+        const exact=weightTotal ? weight/weightTotal*target : 0;
+        const cents=Math.floor(exact);
+        return {index,cents,fraction:exact-cents};
+      });
+      let remaining=target-parts.reduce((sum,p)=>sum+p.cents,0);
+      const ranked=parts.slice().sort((a,b)=>b.fraction-a.fraction||a.index-b.index);
+      for(let i=0;i<remaining;i++) ranked[i%ranked.length].cents++;
+      return items.map((it,i)=>({...it,cost:parts[i].cents/100}));
+    }
     /* الزيارات بعد تطبيق تصفية البحث والتاريخ في صفحة سجل الزيارات (تُستخدم في العرض والتصدير) */
     function getFilteredVisibleVisits(){
       const q=document.getElementById("visitSearch")?.value.trim().toLowerCase()||"";
@@ -1729,6 +1772,45 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
     function value(v){return v===null||v===undefined||v===""?"غير مدخل":esc(v)}
     function letter(n){return String(n||"m").trim()[0]||"m"}
+    // Prices and visits are kept in Sudanese pounds; dollar prices and the
+    // rate are only used to calculate the current catalogue price. A visit
+    // stores its own price snapshot and is never repriced when the rate changes.
+    const MAX_MONEY=1000000000000;
+    function roundMoney(n){
+      const number=Number(n);
+      if(!Number.isFinite(number)) return number;
+      // Shift using decimal notation before rounding: values such as 10.075
+      // otherwise land just below the half-cent in binary floating point.
+      const [mantissa,exponent="0"]=String(Math.abs(number)).split("e");
+      const cents=Math.round(Number(mantissa+"e"+(Number(exponent)+2)));
+      return (number<0?-1:1)*Number(cents+"e-2");
+    }
+    function validMoney(n){ return typeof n==="number" && Number.isFinite(n) && n>=0 && n<=MAX_MONEY; }
+    function validExchangeRate(n){ return typeof n==="number" && Number.isFinite(n) && n>0 && n<=MAX_MONEY; }
+    function savedExchangeRate(){
+      const value=pricing.find(p=>p.id==="usd-sdg")?.rate;
+      return validExchangeRate(value) ? value : null;
+    }
+    function usdPrice(proc){
+      if(proc?.usdPrice===undefined || proc.usdPrice===null || proc.usdPrice==="") return null;
+      const n=Number(proc.usdPrice);
+      return validMoney(n) ? n : null;
+    }
+    function pricingConfigurationInvalid(){
+      const rate=savedExchangeRate();
+      return procedures.some(proc=>{
+        if(proc?.usdPrice===undefined || proc.usdPrice===null || proc.usdPrice==="") return false;
+        const usd=usdPrice(proc);
+        return usd===null || rate===null || !validMoney(usd*rate);
+      });
+    }
+    function procedurePrice(proc){
+      if(!proc) return 0;
+      const usd=usdPrice(proc), rate=savedExchangeRate();
+      if(usd!==null && rate!==null && validMoney(usd*rate)) return roundMoney(usd*rate);
+      const fallback=Number(proc.cost);
+      return validMoney(fallback) ? fallback : 0;
+    }
     function money(v){return Number(v||0).toLocaleString("ar-SD")+" ج.س"} 
     function date(v){
       if(!v) return "غير محدد";
@@ -1815,6 +1897,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             patients,
             visits,
             procedures,
+            pricing,
             customLists,
             expenses,
             inventory,
@@ -1916,7 +1999,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const activeVisits = getVisibleVisits();
       const recent=[...activeVisits].sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,5);
       const totalDue = activeVisits.filter(isCompletedVisit).reduce((s,v)=>s+Number(v.due||0),0);
-      return`<section class="view"><div class="heading"><div><p class="eyebrow">لوحة إدارة عيادة الأسنان</p><h1>أهلاً بك، إدارة العيادة</h1><p class="sub">متابعة شاملة للأداء المالي، حركة المرضى، والمخزون بكفاءة عالية.</p></div><div class="button-row"><button class="secondary" data-view="reports">التقرير الشامل والأداء</button><button class="primary" data-view="new-visit">＋ تسجيل زيارة</button></div></div><div class="hero"><div class="hero-inner"><p class="eyebrow">بحث سريع</p><h2>ابحث في سجلات العيادة، المرضى، أو المواعيد</h2><p>ادخل اسم المريض، الجوال، أو رقم الملف للوصول السريع للسجل الطبي والزيارات.</p><div class="search"><span>⌕</span><input id="dashSearch" placeholder="اكتب اسم المريض، رقم الملف، أو الهاتف..." autocomplete="off"></div><div id="dashSearchResults"></div></div></div><div class="stats">${card("إجمالي المرضى",patients.length,"السجلات المحفوظة","♙")}${card("الزيارات المسجلة",activeVisits.length,"إجمالي الحالات المتاحة","◷")}${card("إجمالي الديون المعلقة",displayCost(totalDue),"مستحقات عند المرضى","💸")}${card("تنبيهات المخزون",inventory.filter(i=>Number(i.qty)<=Number(i.minQty)).length,"مواد أوشكت على النفاد","📦")}</div><div class="two-col"><section class="panel"><div class="panel-head"><div><h2>أحدث الزيارات والأبحاث</h2><p>آخر الإجراءات المسجلة بالعيادة</p></div><button class="link-btn" data-view="visits">سجل الزيارات ←</button></div>${recent.length?recent.map(v=>visitRow(v)).join(""):`<div class="empty">لا توجد زيارات متاحة لهذه الوردية.</div>`}</section><section class="panel"><div class="panel-head"><div><h2>الإجراءات الأكثر طلباً</h2><p>ترتيب الإجراءات حسب عدد المرات</p></div><button class="link-btn" data-view="reports">التقارير الشاملة ←</button></div>${topProcedures().map((r,i)=>`<div class="patient-row"><div class="initial">${i+1}</div><div class="row-main"><strong>${esc(r.name)}</strong><span>${r.count} زيارة مسجلة</span></div><div class="row-meta">${displayCost(r.total)}</div></div>`).join("")||`<div class="empty">ستظهر الإجراءات هنا بعد تسجيل الزيارات.</div>`}</section></div></section>`
+      const totalDiscount = roundMoney(activeVisits.filter(isCompletedVisit).reduce((s,v)=>s+visitTotalDiscount(v),0));
+      return`<section class="view"><div class="heading"><div><p class="eyebrow">لوحة إدارة عيادة الأسنان</p><h1>أهلاً بك، إدارة العيادة</h1><p class="sub">متابعة شاملة للأداء المالي، حركة المرضى، والمخزون بكفاءة عالية.</p></div><div class="button-row"><button class="secondary" data-view="reports">التقرير الشامل والأداء</button><button class="primary" data-view="new-visit">＋ تسجيل زيارة</button></div></div><div class="hero"><div class="hero-inner"><p class="eyebrow">بحث سريع</p><h2>ابحث في سجلات العيادة، المرضى، أو المواعيد</h2><p>ادخل اسم المريض، الجوال، أو رقم الملف للوصول السريع للسجل الطبي والزيارات.</p><div class="search"><span>⌕</span><input id="dashSearch" placeholder="اكتب اسم المريض، رقم الملف، أو الهاتف..." autocomplete="off"></div><div id="dashSearchResults"></div></div></div><div class="stats">${card("إجمالي المرضى",patients.length,"السجلات المحفوظة","♙")}${card("الزيارات المسجلة",activeVisits.length,"إجمالي الحالات المتاحة","◷")}${card("إجمالي الديون المعلقة",displayCost(totalDue),"مستحقات عند المرضى","💸")}${card("تنبيهات المخزون",inventory.filter(i=>Number(i.qty)<=Number(i.minQty)).length,"مواد أوشكت على النفاد","📦")}</div>${adminUnlocked ? `<section class="panel" id="discountIndicator" style="padding:20px 22px;margin-bottom:24px"><div class="panel-head" style="padding:0;border:0"><div><h2>📉 المبالغ المخفّضة المسجّلة</h2><p>إجمالي الخصومات والتخفيضات اليدوية المسجّلة للزيارات المكتملة، لكل الفترات. لا يمثّل ديون المرضى أو النقد المفقود، ولا يشمل خصومات سابقة غير مسجّلة.</p></div><strong style="color:var(--red);font-size:21px">${money(totalDiscount)}</strong></div></section>` : ''}<div class="two-col"><section class="panel"><div class="panel-head"><div><h2>أحدث الزيارات والأبحاث</h2><p>آخر الإجراءات المسجلة بالعيادة</p></div><button class="link-btn" data-view="visits">سجل الزيارات ←</button></div>${recent.length?recent.map(v=>visitRow(v)).join(""):`<div class="empty">لا توجد زيارات متاحة لهذه الوردية.</div>`}</section><section class="panel"><div class="panel-head"><div><h2>الإجراءات الأكثر طلباً</h2><p>ترتيب الإجراءات حسب عدد المرات</p></div><button class="link-btn" data-view="reports">التقارير الشاملة ←</button></div>${topProcedures().map((r,i)=>`<div class="patient-row"><div class="initial">${i+1}</div><div class="row-main"><strong>${esc(r.name)}</strong><span>${r.count} زيارة مسجلة</span></div><div class="row-meta">${displayCost(r.total)}</div></div>`).join("")||`<div class="empty">ستظهر الإجراءات هنا بعد تسجيل الزيارات.</div>`}</section></div></section>`
     }
 
         function appointmentsPage(){
@@ -2153,7 +2237,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function topProcedures(){
       const map=Object.create(null);
       getVisibleVisits().filter(isCompletedVisit).forEach(v=>{
-        const items = v.items && v.items.length ? v.items : [{procedure: v.procedure, cost: v.cost}];
+        const items = visitNetItems(v);
         items.forEach(it => {
           if(!it.procedure) return;
           map[it.procedure] ??= {name:it.procedure, count:0, total:0};
@@ -2243,27 +2327,43 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             ? '<strong>وضع المدير مفعّل:</strong> يمكنك إضافة إجراءات جديدة، تعديل أسعار الإجراءات، وتغيير كلمة سر المدير.' 
             : '<strong>وضع العرض فقط:</strong> لتعديل أسعار الإجراءات أو تغيير كلمة سر المدير، يرجى تسجيل الدخول كمدير من القائمة الجانبية.'}
         </div>
-        <section class="panel">
-          <div class="panel-head"><div><h2>قائمة الإجراءات الطبية والتسعير</h2><p>الأسعار الافتراضية بالإدراج التلقائي عند تسجيل زيارة</p></div></div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>#</th><th>اسم الإجراء الطبي</th><th>السعر الافتراضي (ج.س)</th>${adminUnlocked ? '<th>إجراءات</th>' : ''}</tr></thead>
-              <tbody>
-                ${procedures.map((proc, idx) => `
-                  <tr>
-                    <td>${idx + 1}</td>
-                    <td><strong>${esc(proc.name)}</strong></td>
-                    <td>
-                      ${adminUnlocked 
-                        ? `<input type="number" min="0" step="any" class="proc-cost-input" data-id="${esc(proc.id)}" value="${esc(proc.cost)}" style="width:130px;height:35px;padding:4px 8px;border:1px solid var(--line);border-radius:6px">`
-                        : `<strong>${money(proc.cost)}</strong>`}
-                    </td>
-                    ${adminUnlocked ? `<td><button class="danger" data-action="delete-procedure" data-id="${esc(proc.id)}">حذف</button></td>` : ''}
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
+        <section class="panel" style="padding-bottom:22px">
+          <div class="panel-head"><div><h2>💱 سعر الصرف وأسعار الإجراءات</h2><p>حدد سعر الدولار مقابل الجنيه، ثم أدخل السعر بالدولار لكل إجراء. الأسعار الجديدة تُستخدم للزيارات القادمة فقط.</p></div></div>
+          ${adminUnlocked ? '<form id="pricingForm" autocomplete="off">' : '<div>'}
+            <div style="padding:0 20px 16px">
+              <div class="form-grid" style="align-items:end">
+                <div class="field"><label for="usdExchangeRate">سعر صرف دولار واحد (ج.س)</label>
+                  ${adminUnlocked
+                    ? `<input type="number" id="usdExchangeRate" min="0.00000001" max="${MAX_MONEY}" step="any" inputmode="decimal" value="${esc(savedExchangeRate()??'')}" placeholder="مثال: 2500">`
+                    : `<strong>${savedExchangeRate()!==null ? money(savedExchangeRate()) : 'لم يُحدّد بعد'}</strong>`}
+                </div>
+                ${adminUnlocked ? '<div class="field"><button type="submit" class="primary" id="savePricingBtn">💾 حفظ سعر الصرف والأسعار</button></div>' : ''}
+              </div>
+              <p class="sub" style="margin-top:10px">أدخل السعر بالدولار يدوياً لكل إجراء تريد ربطه بالصرف. الإجراءات التي تترك سعر الدولار فيها فارغاً تحتفظ بسعرها بالجنيه ويمكن تعديله يدوياً. إفراغ سعر الدولار يفصل الإجراء عن الصرف مع إبقاء السعر المعروض. اضغط «حفظ» لتطبيق التعديلات؛ لا تتغير أسعار الزيارات المسجّلة.</p>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>#</th><th>اسم الإجراء الطبي</th><th>السعر الأساسي ($)</th><th>السعر الافتراضي (ج.س)</th>${adminUnlocked ? '<th>إجراءات</th>' : ''}</tr></thead>
+                <tbody>
+                  ${procedures.map((proc, idx) => `
+                    <tr class="pricing-row" data-id="${esc(proc.id)}">
+                      <td>${idx + 1}</td>
+                      <td><strong>${esc(proc.name)}</strong></td>
+                      <td>${adminUnlocked
+                        ? `<input aria-label="السعر بالدولار - ${esc(proc.name)}" type="number" min="0" max="${MAX_MONEY}" step="any" class="proc-usd-input" data-id="${esc(proc.id)}" value="${esc(usdPrice(proc)??'')}" placeholder="غير مربوط" style="width:135px;height:35px;padding:4px 8px;border:1px solid var(--line);border-radius:6px">`
+                        : (usdPrice(proc)!==null ? `<strong>${esc(usdPrice(proc))} $</strong>` : '<span class="sub">غير مربوط</span>')}
+                      </td>
+                      <td>${adminUnlocked
+                        ? `<input aria-label="السعر بالجنيه - ${esc(proc.name)}" type="number" min="0" max="${MAX_MONEY}" step="any" class="proc-cost-input" data-id="${esc(proc.id)}" value="${esc(procedurePrice(proc))}" ${usdPrice(proc)!==null?'readonly':''} style="width:150px;height:35px;padding:4px 8px;border:1px solid var(--line);border-radius:6px">`
+                        : `<strong>${money(procedurePrice(proc))}</strong>`}
+                      </td>
+                      ${adminUnlocked ? `<td><button type="button" class="danger" data-action="delete-procedure" data-id="${esc(proc.id)}">حذف</button></td>` : ''}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          ${adminUnlocked ? '</form>' : '</div>'}
         </section>
       </section>`;
     }
@@ -2310,7 +2410,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       return`<section class="view"><div class="heading"><div><p class="eyebrow">المتابعة اليومية</p><h1>سجل الزيارات والحالات</h1><p class="sub">كل إجراء طبي تم تنفيذه مع المريض والمدفوعات والمستحقات.</p></div><div class="button-row">${adminUnlocked?`<button class="secondary" data-action="export-visits" title="تصدير كل الزيارات الظاهرة حالياً (مع مراعاة البحث والتاريخ المحدد) إلى ملف Excel">⬇ تصدير الزيارات (Excel)</button>`:""}<button class="primary" data-view="new-visit">＋ تسجيل زيارة جديدة</button></div></div><div class="toolbar"><input id="visitSearch" placeholder="بحث باسم المريض أو الطبيب أو الشكوى..."><input id="visitDate" type="date" title="تصفية حسب التاريخ"><span class="sub">${activeVisits.length} زيارة مسجلة</span></div><section class="panel" id="visitsTable">${visitsTable(activeVisits)}</section></section>`
     }
     
-    function visitsTable(list){if(!list.length)return`<div class="empty">لا توجد زيارات مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>الرقم/التاريخ</th><th>المريض / الكرسي</th><th>الطبيب والشفت</th><th>الشكوى والتشخيص</th><th>المبالغ (إجمالي/مدفوع/دين)</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${list.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(v=>{const p=getPatient(v.patientId);const name = p ? p.fullName : (v.patientName || "غير محدد");return`<tr><td><strong>زيارة (${value(v.visitNum||"1")})</strong><br><small class="sub">${date(v.date)}</small></td><td><strong>${value(name)}</strong><br><small class="sub">${value(v.chair||"كرسي 1")}</small></td><td><strong>${value(v.doctor||"د. عثمان")}</strong><br><span class="badge gold">${value(v.shift||"صباح")}</span></td><td><strong>الشكوى:</strong> ${value(v.mainComplaint)}<br><small class="sub"><strong>العلاج:</strong> ${value(visitProcedureNames(v))}</small>${v.planWorked?`<br><small class="sub" style="color:var(--gold-dark)"><strong>من الخطة العلاجية:</strong> ${esc(v.planWorked)}</small>`:""}</td><td><strong>الإجمالي:</strong> ${money(v.cost)}<br><small class="sub" style="color:var(--green)">مدفوع: ${money(v.paid||0)}</small><br><small class="sub" style="color:var(--red)">متبقي: ${money(v.due||0)}</small></td><td><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></td><td><div class="button-row">${button("تعديل","edit-visit",v.id)}${adminUnlocked?button("حذف","delete-visit",v.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
+    function visitsTable(list){if(!list.length)return`<div class="empty">لا توجد زيارات مطابقة.</div>`;return`<div class="table-wrap"><table><thead><tr><th>الرقم/التاريخ</th><th>المريض / الكرسي</th><th>الطبيب والشفت</th><th>الشكوى والتشخيص</th><th>المبالغ (إجمالي/مدفوع/دين)</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody>${list.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(v=>{const p=getPatient(v.patientId);const name = p ? p.fullName : (v.patientName || "غير محدد");return`<tr><td><strong>زيارة (${value(v.visitNum||"1")})</strong><br><small class="sub">${date(v.date)}</small></td><td><strong>${value(name)}</strong><br><small class="sub">${value(v.chair||"كرسي 1")}</small></td><td><strong>${value(v.doctor||"د. عثمان")}</strong><br><span class="badge gold">${value(v.shift||"صباح")}</span></td><td><strong>الشكوى:</strong> ${value(v.mainComplaint)}<br><small class="sub"><strong>العلاج:</strong> ${value(visitProcedureNames(v))}</small>${v.planWorked?`<br><small class="sub" style="color:var(--gold-dark)"><strong>من الخطة العلاجية:</strong> ${esc(v.planWorked)}</small>`:""}</td><td><strong>الإجمالي بعد الخصم:</strong> ${money(v.cost)}${visitTotalDiscount(v)>0?`<br><small class="sub" style="color:var(--red)">تخفيض مسجّل: ${money(visitTotalDiscount(v))}</small>`:''}<br><small class="sub" style="color:var(--green)">مدفوع: ${money(v.paid||0)}</small><br><small class="sub" style="color:var(--red)">متبقي: ${money(v.due||0)}</small></td><td><span class="badge ${v.status==='ملغاة'?'red':''}">${value(v.status||"مكتملة")}</span></td><td><div class="button-row">${button("تعديل","edit-visit",v.id)}${adminUnlocked?button("حذف","delete-visit",v.id,"danger"):""}</div></td></tr>`}).join("")}</tbody></table></div>`}
     
     function lockedPage(title, desc){
       return `<section class="view"><div class="heading"><div><p class="eyebrow">صلاحيات محدودة</p><h1>${title}</h1><p class="sub">${desc}</p></div></div><div class="panel" style="padding:40px;text-align:center"><p style="font-size:16px;color:var(--muted)">يرجى تسجيل الدخول بحساب المدير للوصول لهذه الصفحة.</p><button class="primary" data-action="admin" style="margin-top:15px">تسجيل دخول المدير</button></div></section>`;
@@ -2358,12 +2458,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const rev=done.reduce((s,v)=>s+Number(v.cost||0),0);
       const paid=done.reduce((s,v)=>s+Number(v.paid||0),0);
       const due=done.reduce((s,v)=>s+Number(v.due||0),0);
+      const discounts=roundMoney(done.reduce((s,v)=>s+visitTotalDiscount(v),0));
+      const discountedVisits=done.filter(v=>visitTotalDiscount(v)>0).length;
       const exp=expList.reduce((s,x)=>s+Number(x.amount||0),0);
       const labCost=labList.filter(l=>l.status!=="ملغى").reduce((s,l)=>s+Number(l.cost||0),0);
       const days=Math.max(1,Math.round((ed-sd)/86400000)+1);
       const svc=Object.create(null),doc=Object.create(null),chair=Object.create(null),shift=Object.create(null),daily=Object.create(null),debtors=Object.create(null);
       done.forEach(v=>{
-        const items=(Array.isArray(v.items)&&v.items.length)?v.items:[{procedure:v.procedure||v.treatment||"علاج",cost:v.cost}];
+        const items=visitNetItems(v);
         items.forEach(it=>{if(!it.procedure)return;svc[it.procedure]=svc[it.procedure]||{n:0,total:0};svc[it.procedure].n++;svc[it.procedure].total+=Number(it.cost||0)});
         const dv=v.doctor||"غير محدد";doc[dv]=doc[dv]||{n:0,total:0};doc[dv].n++;doc[dv].total+=Number(v.cost||0);
         const cv=v.chair||"كرسي 1";chair[cv]=(chair[cv]||0)+1;
@@ -2381,7 +2483,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const rep=done.filter(v=>v.visitType==="متابعة").length;
       const cancels=vs.filter(v=>v.status==="ملغاة").length;
       const expByCat=Object.create(null);expList.forEach(x=>{const k=x.category||"أخرى";expByCat[k]=(expByCat[k]||0)+Number(x.amount||0)});
-      return{vs,done,rev,paid,due,exp,expByCat,expList,expCats:groupExpensesByCategory(expList),labList,labCost,days,svc,doc,chair,shift,daily,debtors,src,newP,rep,cancels,net:paid-exp,avgInvoice:done.length?rev/done.length:0,appointmentCount:periodAppointments.length,cancelRate:periodAppointments.length?cancels/periodAppointments.length*100:0,visitsPerDay:done.length/days};
+      return{vs,done,rev,paid,due,discounts,discountedVisits,exp,expByCat,expList,expCats:groupExpensesByCategory(expList),labList,labCost,days,svc,doc,chair,shift,daily,debtors,src,newP,rep,cancels,net:paid-exp,avgInvoice:done.length?rev/done.length:0,appointmentCount:periodAppointments.length,cancelRate:periodAppointments.length?cancels/periodAppointments.length*100:0,visitsPerDay:done.length/days};
     }
 
     /* ===== مكوّنات الرسم (SVG/DOM خالص — بلا مكتبات خارجية) ===== */
@@ -2507,10 +2609,12 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       return`
       <div class="alerts">${alerts.join("")}</div>
 
+      <p class="chart-note">التخفيضات هي الخصومات المسجّلة والخفض اليدوي عن سعر الإجراء وقت اختياره للزيارات المكتملة في الفترة. لا تُكتشف خصومات قديمة لم تُسجّل، ولا تثبت فقدان نقد.</p>
       <div class="kpis">
         ${kpiCard("إجمالي الإيراد (قيمة الخدمات)",money(cur.rev),"قيمة ما نُفّذ بالفترة",prev?dd(cur.rev,prev.rev):null,sparkDaily("cost"))}
         ${kpiCard("مدفوع الزيارات",money(cur.paid),"يُنسب إلى تاريخ الزيارة",prev?dd(cur.paid,prev.paid):null,sparkDaily("paid"))}
         ${kpiCard("ديون جديدة بالفترة",money(cur.due),"مبالغ تأجلت للمرضى",prev?dd(cur.due,prev.due):null)}
+        ${kpiCard("المبالغ المخفّضة المسجّلة",money(cur.discounts),cur.discountedVisits+" زيارات مكتملة؛ ليست نقداً مفقوداً",prev?dd(cur.discounts,prev.discounts):null)}
         ${kpiCard("صافي (المحصّل − المصاريف)",money(cur.net),"مصاريف الفترة: "+money(cur.exp),prev?dd(cur.net,prev.net):null)}
         ${kpiCard("عدد الزيارات المنفذة",cur.done.length+" زيارة",Math.round(cur.visitsPerDay*10)/10+" زيارة/يوم",prev?dd(cur.done.length,prev.done.length):null)}
         ${kpiCard("كشوف جديدة / متابعات",cur.newP+" / "+cur.rep,"نسبة المتابعات "+(cur.newP+cur.rep?Math.round(cur.rep/(cur.newP+cur.rep)*100):0)+"%",prev?dd(cur.newP+cur.rep,prev.newP+prev.rep):null)}
@@ -2612,6 +2716,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div style="text-align:left;font-size:11.5px;color:var(--muted)">رقم التقرير: أ-${ymd(s).replace(/-/g,"")}<br>تاريخ الإصدار: ${fmtDay(new Date())}</div>
         </div>
         <div class="rep-sec"><h3>١. الملخص التنفيذي</h3>
+          <p>التخفيضات المعروضة هي المسجّلة فقط للزيارات المكتملة، وليست ديوناً أو دليلاً على نقد مفقود.</p>
           <div class="rep-kv">
             <div>إجمالي الإيراد<b>${money(c.rev)}</b></div>
             <div>المحصّل فعلياً<b>${money(c.paid)}</b></div>
@@ -2620,6 +2725,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             <div>عدد الزيارات المنفذة<b>${c.done.length}</b></div>
             <div>كشوف جديدة<b>${c.newP}</b></div>
             <div>ديون جديدة بالفترة<b>${money(c.due)}</b></div>
+            <div>خصومات وتخفيضات مسجّلة<b>${money(c.discounts)}</b></div>
             <div>متوسط الفاتورة<b>${money(c.avgInvoice)}</b></div>
           </div>
           <ul>
@@ -2634,7 +2740,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         <div class="rep-sec"><h3>٤. ${NARR_TABS[2][1].substring(2)}</h3><ul id="sheet-marketing">${bullets(n.marketing)}</ul></div>
         <div class="rep-sec"><h3>٥. الأداء المالي</h3>
           <table><thead><tr><th>البند</th><th>المبلغ</th><th>% من الإيراد</th></tr></thead><tbody>
-          <tr><td>إيراد الخدمات المنفذة</td><td><strong>${money(c.rev)}</strong></td><td>${c.rev?"100%":"—"}</td></tr>
+          <tr><td>إيراد الخدمات المنفذة بعد الخصومات</td><td><strong>${money(c.rev)}</strong></td><td>${c.rev?"100%":"—"}</td></tr>
+          <tr><td>الخصومات والتخفيضات المسجّلة (للعرض؛ لا تُخصم مرة أخرى)</td><td>${money(c.discounts)}</td><td>—</td></tr>
           ${expRows.map(([k,v])=>`<tr><td>مصروف: ${esc(k)}</td><td style="color:var(--red)">− ${money(v)}</td><td>${c.rev?Math.round(v/c.rev*100)+"%":"—"}</td></tr>`).join("")}
           <tr><td><strong>الصافي (المحصّل − المصاريف)</strong></td><td style="color:${c.net>=0?"var(--green)":"var(--red)"}"><strong>${money(c.net)}</strong></td><td></td></tr>
           </tbody></table>
@@ -2773,18 +2880,18 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         // 2) الزيارات
         const fileOf=id=>{const p=getPatient(id);return p?String(p.file??""):""};
         const nameOf=v=>{const p=getPatient(v.patientId);return p?p.fullName:(v.patientName||"")};
-        const vRows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","إجمالي المبلغ","المدفوع","المتبقي (دين)","حالة الزيارة"]];
+        const vRows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","قبل الخصم الإضافي","الخصم الإضافي","إجمالي التخفيض المسجّل","الإجمالي بعد الخصم","المدفوع","المتبقي (دين)","حالة الزيارة"]];
         sorted.forEach(p=>visitsOf(p.id).forEach((v,i)=>vRows.push([
           fileOf(v.patientId), nameOf(v), v.visitNum||String(i+1), normDate(v.date)||"", v.shift||"", v.visitType||"", v.doctor||"", v.chair||"", v.mainComplaint||"", v.diagnosis||"",
           (Array.isArray(v.items)&&v.items.length)?v.items.filter(it=>it&&it.procedure).map(it=>it.procedure+" ("+xnum(it.cost).toLocaleString("en")+")").join("، "):(v.procedure||v.treatment||""),
-          v.planWorked||"", xnum(v.cost), xnum(v.paid), xnum(v.due), v.status||"مكتملة"
+          v.planWorked||"", xnum(v.grossCost??(xnum(v.cost)+visitExplicitDiscount(v))), visitExplicitDiscount(v), visitTotalDiscount(v), xnum(v.cost), xnum(v.paid), xnum(v.due), v.status||"مكتملة"
         ])));
 
         // 3) الإجراءات التفصيلية
-        const iRows=[["رقم الملف","اسم المريض","تاريخ الزيارة","الطبيب المعالج","الإجراء","التكلفة"]];
+        const iRows=[["رقم الملف","اسم المريض","تاريخ الزيارة","الطبيب المعالج","الإجراء","التكلفة بعد توزيع الخصم"]];
         sorted.forEach(p=>visitsOf(p.id).forEach(v=>{
           if(!isCompletedVisit(v)) return;
-          const it=(Array.isArray(v.items)&&v.items.length)?v.items:[{procedure:v.procedure||v.treatment||"",cost:v.cost}];
+          const it=visitNetItems(v);
           it.forEach(x=>{if(x&&x.procedure)iRows.push([fileOf(v.patientId),nameOf(v),normDate(v.date)||"",v.doctor||"",x.procedure,xnum(x.cost)])});
         }));
 
@@ -2845,12 +2952,12 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         const fileOf=id=>{const p=getPatient(id);return p?String(p.file??""):""};
         const nameOf=v=>{const p=getPatient(v.patientId);return p?p.fullName:(v.patientName||"غير محدد")};
         const procTxt=v=>{const it=(Array.isArray(v.items)&&v.items.length)?v.items:[]; return it.length?it.filter(i=>i&&i.procedure).map(i=>i.procedure+" ("+xnum(i.cost).toLocaleString("en")+")").join("، "):(v.procedure||v.treatment||"");};
-        const rows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","إجمالي المبلغ (ج.س)","المدفوع (ج.س)","المتبقي (دين)","حالة الزيارة"]];
-        let tCost=0,tPaid=0,tDue=0,cancelled=0,booked=0;
+        const rows=[["رقم الملف","اسم المريض","رقم الزيارة","تاريخ الزيارة","الوردية","نوع الزيارة","الطبيب المعالج","الكرسي","الشكوى الرئيسية","التشخيص الطبي","الإجراءات المنفذة","ما تم من الخطة العلاجية","قبل الخصم الإضافي (ج.س)","الخصم الإضافي (ج.س)","إجمالي التخفيض المسجّل (ج.س)","الإجمالي بعد الخصم (ج.س)","المدفوع (ج.س)","المتبقي (دين)","حالة الزيارة"]];
+        let tCost=0,tPaid=0,tDue=0,tDiscount=0,cancelled=0,booked=0;
         list.forEach(v=>{
           const done=isCompletedVisit(v);
-          rows.push([fileOf(v.patientId),nameOf(v),v.visitNum||"",normDate(v.date)||"",v.shift||"",v.visitType||"",v.doctor||"",v.chair||"",v.mainComplaint||"",v.diagnosis||"",procTxt(v),v.planWorked||"",xnum(v.cost),xnum(v.paid),xnum(v.due),v.status||"مكتملة"]);
-          if(done){tCost+=xnum(v.cost);tPaid+=xnum(v.paid);tDue+=xnum(v.due);}else if(v.status==="محجوزة") booked++; else cancelled++;
+          rows.push([fileOf(v.patientId),nameOf(v),v.visitNum||"",normDate(v.date)||"",v.shift||"",v.visitType||"",v.doctor||"",v.chair||"",v.mainComplaint||"",v.diagnosis||"",procTxt(v),v.planWorked||"",xnum(v.grossCost??(xnum(v.cost)+visitExplicitDiscount(v))),visitExplicitDiscount(v),visitTotalDiscount(v),xnum(v.cost),xnum(v.paid),xnum(v.due),v.status||"مكتملة"]);
+          if(done){tCost+=xnum(v.cost);tPaid+=xnum(v.paid);tDue+=xnum(v.due);tDiscount+=visitTotalDiscount(v);}else if(v.status==="محجوزة") booked++; else cancelled++;
         });
         const wb=XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,xlsxSheet(rows),"الزيارات");
@@ -2861,9 +2968,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           ["زيارات مكتملة",list.length-cancelled-booked],
           ["مواعيد محجوزة",booked],
           ["زيارات ملغاة",cancelled],
-          ["إجمالي قيمة العلاج (ج.س)",Math.round(tCost)],
-          ["إجمالي المدفوع (ج.س)",Math.round(tPaid)],
-          ["إجمالي المتبقي — دين (ج.س)",Math.round(tDue)],
+          ["إجمالي قيمة العلاج بعد الخصم (ج.س)",roundMoney(tCost)],
+          ["التخفيضات المسجّلة (ج.س)",roundMoney(tDiscount)],
+          ["إجمالي المدفوع (ج.س)",roundMoney(tPaid)],
+          ["إجمالي المتبقي — دين (ج.س)",roundMoney(tDue)],
           [],
           ["تاريخ التصدير",todayString()]
         ]),"الملخص");
@@ -2878,13 +2986,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         if(typeof XLSX==="undefined"||!XLSX.utils){message("مكتبة Excel غير متاحة حالياً.");return}
         const[s,e]=reportRange();
         const c=computeRange(s,e);
-        const R=v=>Math.round(Number(v||0));
+        const R=v=>roundMoney(Number(v||0));
         const wb=XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
           ["تقرير عيادة أوراس — من "+ymd(s)+" إلى "+ymd(e)],
           [],
           ["البيان","القيمة (ج.س)"],
-          ["إجمالي الإيراد",R(c.rev)],
+          ["إجمالي الإيراد بعد الخصومات",R(c.rev)],
+          ["الخصومات والتخفيضات المسجّلة",c.discounts],
           ["المحصّل فعلياً",R(c.paid)],
           ["ديون الفترة",R(c.due)],
           ["المصاريف",R(c.exp)],
@@ -2926,13 +3035,14 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const totalRev = visits.reduce((s,v)=>s+Number(v.cost||0),0);
       const totalPaid = visits.reduce((s,v)=>s+Number(v.paid||0),0);
       const totalDue = visits.reduce((s,v)=>s+Number(v.due||0),0);
+      const totalDiscount = roundMoney(visits.reduce((s,v)=>s+visitTotalDiscount(v),0));
       const totalExp = expP.reduce((s,e)=>s+Number(e.amount||0),0);
       const netProfit = totalPaid - totalExp;
       const periodLabel = (from||to) ? `من ${from||"الأول"} إلى ${to||"اليوم"}` : "كافة الفترات المسجلة";
 
       const procMap = Object.create(null);
       visits.forEach(v=>{
-        const items = Array.isArray(v.items) && v.items.length ? v.items : [{procedure:v.procedure,cost:v.cost}];
+        const items = visitNetItems(v);
         items.forEach(it=>{ if(!it.procedure) return; procMap[it.procedure]=procMap[it.procedure]||{count:0,total:0}; procMap[it.procedure].count++; procMap[it.procedure].total+=Number(it.cost||0); });
       });
       const procRows = Object.keys(procMap).map(k=>({name:k,...procMap[k]})).sort((a,b)=>b.total-a.total);
@@ -3001,6 +3111,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         ${card("إجمالي الزيارات", visits.length, "زيارات منجزة", "◷")}
         ${card("كشوف جديدة", newP, "استقطاب جديد", "♙")}
         ${card("الديون المعلقة", money(totalDue), "متبقية عند المرضى", "⚠️")}
+        ${card("التخفيضات المسجّلة", money(totalDiscount), "ليست ديوناً أو نقداً مفقوداً", "📉")}
         ${card("هامش الربحية", totalPaid ? Math.round(netProfit/totalPaid*100)+"%" : "0%", "الصافي إلى المحصل", "📊")}
       </div>
       <div class="note-box">يقدم هذا التقرير نظرة تجميعية كاملة لكل أنشطة العيادة خلال ${esc(periodLabel)}. تم تسجيل <strong>${visits.length}</strong> زيارة باجمالي إيرادات <strong>${money(totalRev)}</strong>، منها محصّلة فعلياً <strong>${money(totalPaid)}</strong>، مقابل مصروفات شاملة بلغت <strong>${money(totalExp)}</strong>؛ محقّقةً صافي ربح قدره <strong>${money(netProfit)}</strong> بهامش ${totalPaid?Math.round(netProfit/totalPaid*100):0}%، مع وجود ديون معلقة بـ <strong>${money(totalDue)}</strong> تتطلب خطة تحصيل.</div>
@@ -4051,6 +4162,10 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const pid = v.patientId || selectedPatientId || (patients[0]?patients[0].id:"");
       const defaultShift = isEmployeeRole() ? (currentRole === "morning" ? "صباح" : "مساء") : (v.shift || "صباح");
       const status = v.status || (view==="new-appointment" ? "محجوزة" : "مكتملة");
+      // Imported older records may have a recorded discount but no original
+      // percentage or item list. Use their gross value and the saved amount.
+      const savedDiscountType=v.discountType==="percent" && v.discountValue!==undefined && v.discountValue!==null && v.discountValue!=="" ? "percent" : "amount";
+      const savedDiscountValue=savedDiscountType==="percent" ? v.discountValue : (v.discountValue??v.discountAmount??0);
 
       return `<section class="view">
         <div class="heading"><div><p class="eyebrow">جلسة علاجية</p><h1>${isEdit?'تعديل بيانات زيارة':view==='new-appointment'?'حجز موعد جديد':'تسجيل زيارة جديدة'}</h1><p class="sub">إدخال التشخيص، الخدمات المتعددة، المبالغ، والشفت.</p></div></div>
@@ -4100,13 +4215,18 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           <div class="form-section">
             <div class="section-title"><span class="section-num">3</span><h2>الخدمات والإجراءات الطبية والتكلفة</h2></div>
             <div id="procedureList">
-              ${v.items && v.items.length ? v.items.map(it=>procedureItemRow(it.procedure, it.cost)).join('') : procedureItemRow(v.procedure||procedures[0]?.name, v.cost??procedures[0]?.cost??"")}
+              ${v.items && v.items.length ? v.items.map(it=>procedureItemRow(it.procedure, it.cost, it.catalogPrice)).join('') : procedureItemRow(v.procedure||procedures[0]?.name, v.id ? visitRawItems(v)[0].cost : (v.cost??procedurePrice(procedures[0])))}
             </div>
             <button type="button" class="secondary" id="addProcedureRowBtn" style="margin-top:10px">＋ إضافة إجراء آخر للزيارة</button>
             <div class="form-grid" style="margin-top:20px">
-              <div class="field"><label>إجمالي المبلغ (ج.س)</label><input type="number" id="vTotalCost" name="cost" value="${esc(v.cost??0)}" readonly style="background:#f5f5f5"></div>
-              <div class="field"><label>المبلغ المدفوع (ج.س)</label><input type="number" id="vPaid" name="paid" min="0" step="any" value="${esc(v.paid??0)}" required></div>
-              <div class="field"><label>المبلغ المتبقي (دين)</label><input type="number" id="vDue" name="due" value="${esc(v.due??0)}" readonly style="background:#f5f5f5"></div>
+              <div class="field"><label for="vGrossCost">إجمالي الإجراءات قبل الخصم الإضافي (ج.س)</label><input type="number" id="vGrossCost" readonly style="background:#f5f5f5"></div>
+              <div class="field"><label for="vDiscountType">نوع الخصم الإضافي</label><select id="vDiscountType" name="discountType"><option value="amount" ${savedDiscountType==="amount"?'selected':''}>مبلغ بالجنيه</option><option value="percent" ${savedDiscountType==="percent"?'selected':''}>نسبة مئوية %</option></select></div>
+              <div class="field"><label for="vDiscountValue">قيمة الخصم الإضافي</label><input type="number" id="vDiscountValue" name="discountValue" min="0" max="${MAX_MONEY}" step="any" value="${esc(savedDiscountValue)}" required></div>
+              <div class="field"><label for="vDiscountAmount">الخصم الإضافي المحتسب (ج.س)</label><input type="number" id="vDiscountAmount" readonly style="background:#f5f5f5"></div>
+              <div class="field"><label for="vTotalDiscount">إجمالي التخفيض المسجّل (ج.س)</label><input type="number" id="vTotalDiscount" readonly style="background:#f5f5f5"><small class="sub">يشمل الخصم الإضافي وأي خفض يدوي عن سعر الإجراء عند اختياره.</small></div>
+              <div class="field"><label for="vTotalCost">الإجمالي بعد الخصم (ج.س)</label><input type="number" id="vTotalCost" name="cost" value="${esc(v.cost??0)}" readonly style="background:#f5f5f5"></div>
+              <div class="field"><label for="vPaid">المبلغ المدفوع (ج.س)</label><input type="number" id="vPaid" name="paid" min="0" max="${MAX_MONEY}" step="any" value="${esc(v.paid??0)}" required><small class="sub">تُقرّب المبالغ المحسوبة إلى منزلتين عشريتين.</small></div>
+              <div class="field"><label for="vDue">المبلغ المتبقي (دين)</label><input type="number" id="vDue" name="due" value="${esc(v.due??0)}" readonly style="background:#f5f5f5"></div>
             </div>
           </div>
 
@@ -4127,16 +4247,17 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       </section>`;
     }
 
-    function procedureItemRow(selectedProc="", costVal=""){
+    function procedureItemRow(selectedProc="", costVal="", catalogPriceVal=null){
       const known=procedures.some(p=>p.name===selectedProc);
-      const currentCost=costVal!=="" && costVal!==undefined && costVal!==null ? costVal : (procedures[0]?.cost??0);
-      return `<div class="procedure-item">
+      const currentCost=costVal!=="" && costVal!==undefined && costVal!==null ? costVal : procedurePrice(procedures[0]);
+      const snapshot=catalogPriceVal!==null && catalogPriceVal!==undefined && catalogPriceVal!=="" && validMoney(Number(catalogPriceVal)) ? Number(catalogPriceVal) : Number(currentCost);
+      return `<div class="procedure-item" data-catalog-price="${esc(validMoney(snapshot)?snapshot:0)}">
         <select class="proc-select" required>
           <option value="" ${!selectedProc && !procedures.length?'selected':''}>اختر إجراءً طبياً</option>
           ${selectedProc && !known?`<option value="${esc(selectedProc)}" data-cost="${esc(currentCost)}" selected>${esc(selectedProc)} (إجراء سابق)</option>`:''}
-          ${procedures.map(p=>`<option value="${esc(p.name)}" data-cost="${esc(p.cost)}" ${p.name===selectedProc?'selected':''}>${esc(p.name)} (${money(p.cost)})</option>`).join('')}
+          ${procedures.map(p=>`<option value="${esc(p.name)}" data-cost="${esc(procedurePrice(p))}" ${p.name===selectedProc?'selected':''}>${esc(p.name)} (${money(procedurePrice(p))})</option>`).join('')}
         </select>
-        <input type="number" class="proc-cost" min="0" step="any" value="${esc(currentCost)}" placeholder="التكلفة" required>
+        <input type="number" class="proc-cost" min="0" max="${MAX_MONEY}" step="any" value="${esc(currentCost)}" placeholder="التكلفة" required>
         <button type="button" class="danger remove-proc-btn">✕</button>
       </div>`;
     }
@@ -4228,6 +4349,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       else if(view==="settings") c.innerHTML = settingsPage();
       else if(view==="reports") c.innerHTML = reportsPage();
 
+      pricingFormOrigin=view==="settings" && adminUnlocked ? {procedures:copyData(procedures),pricing:copyData(pricing)} : null;
+      pricingFormDirty=false;
       bindEvents();
       if(document.getElementById("vForm")) calcVisitTotals();
       captureFormOrigin();
@@ -4235,25 +4358,118 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     }
 
     function calcVisitTotals(){
-      let total = 0;
+      let gross=0, manualReduction=0;
       document.querySelectorAll("#procedureList .procedure-item").forEach(row=>{
-        const costInput = row.querySelector(".proc-cost");
-        if(costInput) total += Number(costInput.value||0);
+        const costInput=row.querySelector(".proc-cost");
+        if(!costInput) return;
+        const n=Number(costInput.value||0), catalogue=Number(row.dataset.catalogPrice);
+        if(validMoney(n)){
+          gross+=n;
+          if(validMoney(catalogue)) manualReduction+=Math.max(0,catalogue-n);
+        }
       });
-      const totalInput = document.getElementById("vTotalCost");
-      const paidInput = document.getElementById("vPaid");
-      const dueInput = document.getElementById("vDue");
+      gross=roundMoney(gross); manualReduction=roundMoney(manualReduction);
+      const discountInput=document.getElementById("vDiscountValue");
+      const discountType=document.getElementById("vDiscountType")?.value==="percent" ? "percent" : "amount";
+      const discountValue=Number(discountInput?.value||0);
+      let discountError="";
+      if(!validMoney(gross)) discountError="إجمالي الإجراءات أكبر من الحد المسموح.";
+      else if(!validMoney(discountValue)) discountError="قيمة الخصم يجب أن تكون رقماً غير سالب.";
+      else if(discountType==="percent" && discountValue>100) discountError="نسبة الخصم لا يمكن أن تتجاوز 100%.";
+      else if(discountType==="amount" && roundMoney(discountValue)>gross) discountError="الخصم لا يمكن أن يتجاوز إجمالي الإجراءات.";
+      discountInput?.setCustomValidity(discountError);
+      const explicit=discountError ? 0 : roundMoney(discountType==="percent" ? gross*discountValue/100 : discountValue);
+      const net=Math.max(0,roundMoney(gross-explicit));
+      const paidInput=document.getElementById("vPaid"), paidRaw=Number(paidInput?.value||0);
+      const paid=validMoney(paidRaw) ? roundMoney(paidRaw) : paidRaw;
+      const due=Math.max(0,roundMoney(net-(validMoney(paid)?paid:0)));
+      if(paidInput) paidInput.setCustomValidity(!validMoney(paidRaw) || paidRaw>net ? "المبلغ المدفوع يجب أن يكون بين صفر والإجمالي بعد الخصم." : "");
+      const set=(id,value)=>{const el=document.getElementById(id);if(el) el.value=value;};
+      set("vGrossCost",gross); set("vDiscountAmount",explicit);
+      set("vTotalDiscount",roundMoney(explicit+manualReduction));
+      set("vTotalCost",net); set("vDue",due);
+      return {gross,manualReduction,discountType,discountValue,explicit,net,paid,due};
+    }
 
-      if(totalInput) totalInput.value = Number(total.toFixed(2));
-      if(paidInput && dueInput){
-        const paid = Number(paidInput.value||0);
-        dueInput.value = Math.max(0, Number((total - paid).toFixed(2)));
-        paidInput.setCustomValidity(paid>total ? "المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الزيارة." : "");
+    function updatePricingPreview(){
+      const form=document.getElementById("pricingForm"), rateInput=document.getElementById("usdExchangeRate");
+      if(!form || !rateInput) return;
+      const text=rateInput.value.trim(), rate=text==="" ? null : Number(text);
+      let needsRate=false;
+      form.querySelectorAll(".pricing-row").forEach(row=>{
+        const usd=row.querySelector(".proc-usd-input"), sdg=row.querySelector(".proc-cost-input");
+        if(!usd || !sdg) return;
+        const hasUsd=usd.value.trim()!=="", price=hasUsd ? Number(usd.value) : null;
+        usd.setCustomValidity("");
+        sdg.readOnly=hasUsd;
+        if(!hasUsd) return;
+        needsRate=true;
+        if(!validMoney(price)) usd.setCustomValidity("أدخل سعراً بالدولار بين صفر والحد الأقصى.");
+        else if(validExchangeRate(rate)){
+          const converted=price*rate;
+          if(!validMoney(converted)) usd.setCustomValidity("السعر الناتج بالجنيه أكبر من الحد المسموح.");
+          else sdg.value=roundMoney(converted);
+        }
+      });
+      rateInput.setCustomValidity(needsRate && rate===null ? "أدخل سعر صرف الدولار أولاً." : rate!==null && !validExchangeRate(rate) ? "أدخل سعر صرف موجباً وصحيحاً." : "");
+    }
+    function preparePricingSave(){
+      if(savesInProgress){ message("جارٍ الحفظ، يرجى الانتظار."); return false; }
+      if(hasUnsavedStorageChanges){
+        if(pricingPendingSave) return true; // retry the same unsaved form without resetting its baseline
+        message("احفظ التغييرات المعلقة أولاً قبل تعديل الأسعار."); return false;
       }
+      try{
+        const currentProcedures=load(PROCEDURES_KEY,seedProcedures), currentPricing=load(PRICING_KEY,[]);
+        if(corruptDataKeys.has(PROCEDURES_KEY) || corruptDataKeys.has(PRICING_KEY)){
+          message("تعذّرت قراءة الأسعار المحفوظة؛ لم يتم تعديلها."); return false;
+        }
+        if(!pricingFormOrigin || !sameData(currentProcedures,pricingFormOrigin.procedures) || !sameData(currentPricing,pricingFormOrigin.pricing)){
+          message("تغيّرت الأسعار في نافذة أخرى؛ لم تُستبدل. انسخ التعديلات وأعد فتح الإعدادات."); return false;
+        }
+        procedures=currentProcedures; pricing=currentPricing;
+        initializeCollectionBaselines();
+        return true;
+      }catch(e){ message("تعذّر التحقق من أحدث الأسعار؛ لم يتم الحفظ."); return false; }
     }
 
     function bindEvents(){
       const content = document.getElementById("content");
+
+      document.getElementById("pricingForm")?.addEventListener("submit", async e=>{
+        e.preventDefault();
+        if(!adminUnlocked){ message("تعديل الأسعار متاح للمدير فقط."); return; }
+        updatePricingPreview();
+        if(!e.target.reportValidity() || !preparePricingSave()) return;
+        const rateText=document.getElementById("usdExchangeRate").value.trim();
+        const rate=rateText==="" ? null : Number(rateText);
+        const updates=new Map();
+        for(const row of e.target.querySelectorAll(".pricing-row")){
+          const usdField=row.querySelector(".proc-usd-input"), sdgField=row.querySelector(".proc-cost-input");
+          const usdText=usdField.value.trim(), usd=usdText==="" ? null : Number(usdText), sdg=Number(sdgField.value);
+          if((usd!==null && (!validMoney(usd) || !validExchangeRate(rate) || !validMoney(usd*rate))) || sdgField.value.trim()==="" || !validMoney(sdg)){
+            message("يرجى إدخال أسعار صحيحة غير سالبة وسعر صرف موجب."); return;
+          }
+          updates.set(row.dataset.id,{usd,sdg:usd===null ? sdg : roundMoney(usd*rate)});
+        }
+        if(updates.size!==procedures.length || procedures.some(p=>!updates.has(String(p.id)))){
+          message("تغيّرت قائمة الإجراءات. أعد فتح الإعدادات قبل الحفظ."); return;
+        }
+        procedures=procedures.map(proc=>{
+          const price=updates.get(String(proc.id)), next={...proc,cost:price.sdg};
+          if(price.usd===null) delete next.usdPrice; else next.usdPrice=price.usd;
+          return next;
+        });
+        const previous=pricing.find(item=>item.id==="usd-sdg");
+        pricing=pricing.filter(item=>item.id!=="usd-sdg");
+        if(rate!==null) pricing.push({...previous,id:"usd-sdg",rate});
+        pricingPendingSave=true;
+        if(!(await save())) return;
+        pricingPendingSave=false;
+        pendingExternalUpdate=false;
+        render();
+        message("تم حفظ سعر الصرف والأسعار. الزيارات السابقة لم تتغير.");
+      });
 
       document.getElementById("pForm")?.addEventListener("submit", async e=>{
         e.preventDefault();
@@ -4316,24 +4532,28 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           const sel = row.querySelector(".proc-select");
           const cost = row.querySelector(".proc-cost");
           if(sel && cost){
-            items.push({procedure: sel.value, cost: Number(cost.value||0)});
+            items.push({procedure: sel.value, cost: Number(cost.value||0), catalogPrice:Number(row.dataset.catalogPrice)});
           }
         });
 
-        calcVisitTotals();
+        const totals=calcVisitTotals();
         if(!e.target.reportValidity()) return;
-        if(!items.length || items.some(it=>!it.procedure || !Number.isFinite(it.cost) || it.cost<0)){
+        if(!items.length || items.some(it=>!it.procedure || !validMoney(it.cost) || !validMoney(it.catalogPrice)) || !validMoney(totals.gross)){
           message("يرجى اختيار إجراء صحيح وتكلفة غير سالبة لكل بند.");
           return;
         }
         data.items = items;
-        data.cost = Number(items.reduce((sum,it)=>sum+it.cost,0).toFixed(2));
-        data.paid = Number(data.paid||0);
-        if(!Number.isFinite(data.paid) || data.paid<0 || data.paid>data.cost){
-          message("يجب أن يكون المدفوع بين صفر وإجمالي الزيارة.");
+        data.grossCost = totals.gross;
+        data.discountType = totals.discountType;
+        data.discountValue = totals.discountValue;
+        data.discountAmount = totals.explicit;
+        data.cost = totals.net;
+        data.paid = totals.paid;
+        if(!validMoney(data.paid) || data.paid>data.cost){
+          message("يجب أن يكون المدفوع بين صفر والإجمالي بعد الخصم.");
           return;
         }
-        data.due = Math.max(0, Number((data.cost - data.paid).toFixed(2)));
+        data.due = totals.due;
 
         if(isEmployeeRole()){
           data.shift = currentRole === "morning" ? "صباح" : "مساء";
@@ -4447,33 +4667,29 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       content.onchange = async e=>{
         if(e.target.classList.contains("proc-select")){
           const opt = e.target.selectedOptions[0];
-          const costInput = e.target.closest(".procedure-item").querySelector(".proc-cost");
+          const row=e.target.closest(".procedure-item");
+          const costInput = row.querySelector(".proc-cost");
           if(opt && costInput){
             costInput.value = opt.dataset.cost || 0;
+            row.dataset.catalogPrice=opt.dataset.cost || 0;
             calcVisitTotals();
           }
         }
-        if(e.target.classList.contains("proc-cost") || e.target.id==="vPaid"){
+        if(e.target.classList.contains("proc-cost") || ["vPaid","vDiscountValue","vDiscountType"].includes(e.target.id)){
           calcVisitTotals();
         }
         if(e.target.id==="themeSelect"){
           setTheme(e.target.value);
         }
-        if(e.target.classList.contains("proc-cost-input")){
-          const id = e.target.dataset.id;
-          const proc = procedures.find(p=>p.id===id);
-          if(proc && adminUnlocked){
-            const amount=Number(e.target.value);
-            if(!Number.isFinite(amount) || amount<0){ message("السعر يجب أن يكون رقماً غير سالب."); return; }
-            proc.cost = amount;
-            if(!(await save())) return;
-            message("تم تحديث سعر الإجراء.");
-          }
-        }
+        if(e.target.id==="usdExchangeRate" || e.target.classList.contains("proc-usd-input")) updatePricingPreview();
       };
 
       content.oninput = e=>{
-        if(e.target.classList.contains("proc-cost") || e.target.id==="vPaid") calcVisitTotals();
+        if(e.target.classList.contains("proc-cost") || ["vPaid","vDiscountValue"].includes(e.target.id)) calcVisitTotals();
+        if(e.target.id==="usdExchangeRate" || e.target.classList.contains("proc-usd-input") || e.target.classList.contains("proc-cost-input")){
+          pricingFormDirty=true;
+          if(e.target.id==="usdExchangeRate" || e.target.classList.contains("proc-usd-input")) updatePricingPreview();
+        }
       };
 
       content.onclick = e=>{
@@ -4498,7 +4714,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         const container = document.getElementById("procedureList");
         if(container){
           const div = document.createElement("div");
-          div.innerHTML = procedureItemRow(procedures[0]?.name, procedures[0]?.cost);
+          div.innerHTML = procedureItemRow(procedures[0]?.name, procedurePrice(procedures[0]));
           container.appendChild(div.firstElementChild);
           calcVisitTotals();
         }
@@ -4737,6 +4953,16 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         message("✅ تم حفظ التقرير الشهري بنجاح. يمكنك الآن معاينته وطباعته، أو تعديله مرة أخرى قبل الطباعة.");
       });
     }
+
+    // Do not silently discard an unfinished bulk pricing form when navigating,
+    // changing theme, opening an action, adding a procedure or logging out.
+    document.addEventListener("click",e=>{
+      if(view!=="settings" || !pricingFormDirty) return;
+      const leaving=e.target.closest("[data-view],[data-action],.theme-option[data-theme],#addProcedureBtn,#roleLogoutBtn");
+      if(leaving && !confirm("لديك تغييرات أسعار غير محفوظة. هل تريد تجاهلها ومتابعة العملية؟")){
+        e.preventDefault(); e.stopImmediatePropagation();
+      }
+    },true);
 
     document.addEventListener("click", async e=>{
       const actionBtn = e.target.closest("[data-action]");
@@ -5158,6 +5384,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         return ["gender","marital","conditions","allergies","women","habits","referral","time","reason","service","meds"].every(key=>record[key]===undefined || record[key]===null || typeof record[key]==="string" || Array.isArray(record[key]));
       }
       if(name==="visits") return objectArray(record.items);
+      if(name==="procedures" && record.usdPrice!==undefined && record.usdPrice!==null && record.usdPrice!=="") return validMoney(Number(record.usdPrice));
+      if(name==="pricing") return record.id==="usd-sdg" && validExchangeRate(record.rate);
       if(name==="treatmentPlans") return objectArray(record.cols);
       if(name==="customLists") return objectArray(record.items);
       if(name==="monthlyReports"){
@@ -5175,7 +5403,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function applyRestoredDataUnlocked(source,reason){
       if(hasUnsavedStorageChanges || pendingNarrativeWrites || narrativeConflictKeys.size){ message("توجد تغييرات غير محفوظة؛ نزّل نسخة احتياطية وحل مشكلة الحفظ قبل الاستعادة."); return false; }
       if(!source || typeof source!=="object" || Array.isArray(source)) throw new Error("بيانات النسخة غير صالحة");
-      const tags={patients:"p",visits:"v",procedures:"p",customLists:"lst",expenses:"e",inventory:"i",labs:"l",treatmentPlans:"pl",monthlyReports:"mr"};
+      const tags={patients:"p",visits:"v",procedures:"p",pricing:"rate",customLists:"lst",expenses:"e",inventory:"i",labs:"l",treatmentPlans:"pl",monthlyReports:"mr"};
       const selected=collectionDefinitions().filter(c=>Object.prototype.hasOwnProperty.call(source,c.name));
       if(!selected.length && !Object.prototype.hasOwnProperty.call(source,"narratives")) throw new Error("لا توجد مجموعات بيانات معروفة في الملف");
       const prepared=[];
@@ -5189,6 +5417,18 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       const hasNarratives=Object.prototype.hasOwnProperty.call(source,"narratives");
       if(hasNarratives && (!source.narratives || typeof source.narratives!=="object" || Array.isArray(source.narratives) || Object.values(source.narratives).some(note=>!note || typeof note!=="object" || Array.isArray(note) || ["achievements","challenges","marketing","nextTasks"].some(key=>note[key]!==undefined && !Array.isArray(note[key]))))) throw new Error("ملاحظات التقارير غير صالحة");
       reloadAllFromStorage();
+      if(selected.some(c=>c.key===PRICING_KEY || c.key===PROCEDURES_KEY)){
+        const nextPricing=prepared.find(x=>x.c.key===PRICING_KEY)?.data ?? pricing;
+        const nextProcedures=prepared.find(x=>x.c.key===PROCEDURES_KEY)?.data ?? procedures;
+        const rate=nextPricing.find(item=>item.id==="usd-sdg")?.rate;
+        for(const proc of nextProcedures){
+          if(proc.usdPrice===undefined || proc.usdPrice===null || proc.usdPrice==="") continue;
+          const usd=Number(proc.usdPrice);
+          if(!validMoney(usd) || !validExchangeRate(rate) || !validMoney(usd*rate)){
+            throw new Error("الأسعار بالدولار تحتاج إلى سعر صرف صالح ومتوافق في النسخة المستعادة");
+          }
+        }
+      }
       // Use the latest persisted report notes for the recovery point, not a
       // stale editor snapshot from before another tab's completed save.
       narratives=loadNarratives();
@@ -5267,7 +5507,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
                 });
               };
 
-              const EXPECTED_SHEETS=['patients','visits','procedures','customLists','expenses','inventory','labs','treatmentPlans','monthlyReports'];
+              const EXPECTED_SHEETS=['patients','visits','procedures','pricing','customLists','expenses','inventory','labs','treatmentPlans','monthlyReports'];
               const presentSheets=EXPECTED_SHEETS.filter(n=>workbook.Sheets[n]);
               if(!presentSheets.length){
                 message("ملف Excel لا يحتوي على أي ورقة بيانات معروفة — لم يتم تغيير أي بيانات.");
@@ -5314,7 +5554,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             }
 
             const source = parsed.data || parsed;
-            const KNOWN_KEYS=['patients','visits','procedures','customLists','expenses','inventory','labs','treatmentPlans','monthlyReports','narratives'];
+            const KNOWN_KEYS=['patients','visits','procedures','pricing','customLists','expenses','inventory','labs','treatmentPlans','monthlyReports','narratives'];
             if(!source || typeof source!=="object" || !KNOWN_KEYS.some(k=>Object.prototype.hasOwnProperty.call(source,k))){
               message("خطأ: الملف لا يحتوي على بيانات عيادة معروفة — لم يتم تغيير أي بيانات.");
               resolve();
@@ -5377,6 +5617,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       patients=load(PATIENTS_KEY,patients);
       visits=load(VISITS_KEY,visits);
       procedures=load(PROCEDURES_KEY,procedures);
+      pricing=load(PRICING_KEY,pricing);
       customLists=load(LISTS_KEY,customLists);
       expenses=load(EXPENSES_KEY,expenses);
       inventory=load(INVENTORY_KEY,inventory);
@@ -5416,7 +5657,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     });
 
     window.addEventListener("beforeunload",e=>{
-      if(hasUnsavedStorageChanges || savesInProgress || pendingNarrativeWrites || narrativeConflictKeys.size){ e.preventDefault(); e.returnValue=""; }
+      if(hasUnsavedStorageChanges || savesInProgress || pendingNarrativeWrites || narrativeConflictKeys.size || (view==="settings" && pricingFormDirty)){ e.preventDefault(); e.returnValue=""; }
     });
 
     window.addEventListener("DOMContentLoaded", async ()=>{

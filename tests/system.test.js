@@ -767,3 +767,298 @@ test('parallel visits for one patient receive distinct visit numbers', async t =
   const numbers=(await data(a,VISITS)).map(v=>Number(v.visitNum)).sort((x,y)=>x-y);
   assert.deepEqual(numbers,[1,2]);
 });
+
+const PROCEDURES = 'oras-dental-procedures-v1';
+const PRICING = 'oras-dental-pricing-v1';
+const AUTOBACKUP = 'oras-dental-autobackup-v1';
+
+test('USD prices use an explicit saved rate, preserve unlinked and historical prices, and survive backups', async t => {
+  const context=await createContext(t);
+  const page=await open(context); await login(page);
+  await createPatient(page,'Currency Patient','910');
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  await page.locator('#vForm button[type="submit"]').click();
+  await waitCount(page,VISITS,1);
+  const original=await data(page,VISITS);
+  assert.equal(original[0].cost,10000);
+
+  await nav(page,'settings');
+  await page.locator('.proc-usd-input').first().fill('12.5');
+  assert.equal(await page.locator('#usdExchangeRate').evaluate(el=>el.checkValidity()),false,'USD prices need a rate');
+  await page.locator('#savePricingBtn').click();
+  assert.equal(await page.evaluate(k=>localStorage.getItem(k),PRICING),null);
+  await page.locator('#usdExchangeRate').fill('2000');
+  assert.equal(await page.locator('.proc-cost-input').first().inputValue(),'25000');
+  assert.equal(await page.locator('.proc-cost-input').first().evaluate(el=>el.readOnly),true);
+  assert.equal(await page.locator('.proc-cost-input').nth(1).inputValue(),'18000');
+  await page.locator('.proc-cost-input').nth(1).fill('19000.123');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.rate===2000,PRICING);
+  assert.deepEqual((await data(page,PROCEDURES)).slice(0,2).map(p=>[p.cost,p.usdPrice??null]),[[25000,12.5],[19000.123,null]]);
+  const autobackup=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),AUTOBACKUP);
+  assert.equal(autobackup.data.pricing[0].rate,2000);
+  assert.equal(autobackup.data.procedures[0].usdPrice,12.5);
+
+  await page.reload(); await login(page); await nav(page,'settings');
+  assert.equal(await page.locator('#usdExchangeRate').inputValue(),'2000');
+  assert.equal(await page.locator('.proc-usd-input').first().inputValue(),'12.5');
+  await page.locator('#usdExchangeRate').fill('3000');
+  assert.equal(await page.locator('.proc-cost-input').first().inputValue(),'37500');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.rate===3000,PRICING);
+  assert.equal((await data(page,PROCEDURES))[0].cost,37500);
+  assert.equal((await data(page,PROCEDURES))[1].cost,19000.123,'changing the rate must not round an unlinked historical price');
+  for(const bad of [[],[{id:'usd-sdg',rate:1000000000000}]]){
+    assert.equal(await page.evaluate(async value=>{
+      try{await applyRestoredData({pricing:value},'invalid-pricing-combination');return false;}catch(e){return true;}
+    },bad),true,'a partial restore must not leave a linked price without a usable rate');
+  }
+  assert.equal((await data(page,PRICING))[0].rate,3000);
+  assert.deepEqual(await data(page,VISITS),original,'changing exchange rates must not reprice saved visits');
+  await nav(page,'visits');
+  await page.locator(`#visitsTable [data-action="edit-visit"][data-id="${original[0].id}"]`).click();
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'10000','editing an old visit must open its saved price');
+
+  await nav(page,'patients');
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'37500','new visits use the current converted price');
+  await nav(page,'settings');
+  await page.locator('.proc-usd-input').first().fill('');
+  assert.equal(await page.locator('.proc-cost-input').first().evaluate(el=>el.readOnly),false);
+  await page.locator('.proc-cost-input').first().fill('40000');
+  await page.locator('#usdExchangeRate').fill('4000');
+  assert.equal(await page.locator('.proc-cost-input').first().inputValue(),'40000','unlinked prices remain manual');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.rate===4000,PRICING);
+  assert.deepEqual([(await data(page,PROCEDURES))[0].cost,(await data(page,PROCEDURES))[0].usdPrice??null],[40000,null]);
+  const backup=await page.evaluate(async()=>{
+    let result; saveBlob=async blob=>{result=JSON.parse(await blob.text());return true;};
+    await backupToJSON(); return result;
+  });
+  assert.equal(backup.data.pricing[0].rate,4000);
+  assert.equal(backup.data.procedures[0].cost,40000);
+  assert.deepEqual(backup.data.visits,original);
+  await page.locator('#usdExchangeRate').fill('5000');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.rate===5000,PRICING);
+  assert.equal(await page.evaluate(async saved=>applyRestoredData(saved.data,'test-pricing-restore'),backup),true);
+  assert.equal((await data(page,PRICING))[0].rate,4000);
+  assert.equal((await data(page,PROCEDURES))[0].cost,40000);
+  assert.deepEqual(await data(page,VISITS),original);
+  assert.equal(await page.evaluate(k=>JSON.parse(localStorage.getItem(k)).data.pricing[0].rate,RECOVERY),5000);
+  assert.equal(await page.evaluate(async saved=>applyRestoredData(saved.data,'test-linked-pricing-restore'),autobackup),true);
+  assert.equal((await data(page,PRICING))[0].rate,2000);
+  assert.deepEqual([(await data(page,PROCEDURES))[0].usdPrice,(await data(page,PROCEDURES))[0].cost],[12.5,25000]);
+  assert.deepEqual(await data(page,VISITS),original);
+  assert.equal(await page.evaluate(async()=>{
+    try{await applyRestoredData({pricing:[{id:'usd-sdg',rate:0}]},'invalid-pricing');return false;}
+    catch(e){return true;}
+  }),true,'invalid backup rates must be rejected');
+});
+
+test('bulk pricing rejects invalid rates and stale edits instead of overwriting another window', async t => {
+  const context=await createContext(t);
+  const a=await open(context), b=await open(context); await login(a); await login(b);
+  await nav(a,'settings'); await nav(b,'settings');
+  await a.locator('#usdExchangeRate').fill('0');
+  assert.equal(await a.locator('#usdExchangeRate').evaluate(el=>el.checkValidity()),false);
+  await a.locator('#usdExchangeRate').fill('1000000000000');
+  await a.locator('.proc-usd-input').first().fill('2');
+  assert.equal(await a.locator('.proc-usd-input').first().evaluate(el=>el.checkValidity()),false,'converted price must be within the safe limit');
+  await a.locator('#usdExchangeRate').fill('1000');
+  await a.locator('.proc-usd-input').first().fill('10');
+
+  await b.locator('#usdExchangeRate').fill('2000');
+  await b.locator('.proc-usd-input').first().fill('20');
+  await b.locator('#savePricingBtn').click();
+  await b.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.rate===2000,PRICING);
+  await a.locator('#savePricingBtn').click();
+  assert.match(await a.locator('#toast').textContent(),/تغيّرت الأسعار/);
+  assert.equal((await data(a,PRICING))[0].rate,2000);
+  assert.equal((await data(a,PROCEDURES))[0].cost,40000);
+});
+
+test('visit discounts affect net charges, debt, service revenue and the completed-only indicator', async t => {
+  const context=await createContext(t,{acceptDownloads:true});
+  const page=await open(context); await login(page); await createPatient(page,'Discount Patient','911');
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  await page.locator('#addProcedureRowBtn').click();
+  await page.locator('#procedureList .proc-select').nth(1).selectOption('تنظيف الأسنان');
+  await page.locator('#procedureList .proc-cost').nth(1).fill('16000'); // 2,000 less than the selected catalogue price
+  await page.locator('#vDiscountType').selectOption('percent');
+  await page.locator('#vDiscountValue').fill('10');
+  await page.locator('#vPaid').fill('5000');
+  assert.deepEqual(await Promise.all(['#vGrossCost','#vDiscountAmount','#vTotalDiscount','#vTotalCost','#vDue'].map(x=>page.locator(x).inputValue())),
+    ['26000','2600','4600','23400','18400']);
+  await page.locator('#vForm button[type="submit"]').click(); await waitCount(page,VISITS,1);
+  let visit=(await data(page,VISITS))[0];
+  assert.deepEqual([visit.items[1].catalogPrice,visit.grossCost,visit.discountType,visit.discountValue,visit.discountAmount,visit.cost,visit.paid,visit.due],
+    [18000,26000,'percent',10,2600,23400,5000,18400]);
+  const patientId=visit.patientId;
+  await page.evaluate(async patientId=>{
+    for(const status of ['محجوزة','ملغاة']) visits.push({id:'excluded-'+status,patientId,date:todayString(),status,cost:9000,paid:0,due:9000,discountAmount:1000,items:[{procedure:'فحص وتشخيص',cost:10000,catalogPrice:10000}]});
+    await save();
+  },patientId);
+  await page.locator('.sidebar button[data-view="dashboard"]').click();
+  const indicator=await page.locator('#discountIndicator').textContent();
+  assert.ok(indicator.includes(await page.evaluate(()=>money(4600))));
+  assert.match(indicator,/لا يمثّل ديون المرضى أو النقد المفقود/);
+  const computed=await page.evaluate(()=>{
+    const c=computeRange(...reportRange());
+    const shares=visitNetItems({items:[{procedure:'A',cost:.01},{procedure:'B',cost:.01},{procedure:'C',cost:.01}],discountAmount:.01});
+    return {rev:c.rev,paid:c.paid,due:c.due,discounts:c.discounts,count:c.discountedVisits,
+      services:Object.fromEntries(Object.entries(c.svc).map(([k,v])=>[k,v.total])),shares:shares.map(x=>x.cost)};
+  });
+  assert.deepEqual([computed.rev,computed.paid,computed.due,computed.discounts,computed.count],[23400,5000,18400,4600,1]);
+  assert.deepEqual(computed.services,{'فحص وتشخيص':9000,'تنظيف الأسنان':14400});
+  assert.equal(Math.round(computed.shares.reduce((a,b)=>a+b,0)*100),2,'rounded service amounts must sum to the invoice');
+
+  await nav(page,'reports');
+  assert.match(await page.locator('#reportTabContent').textContent(),/المبالغ المخفّضة المسجّلة/);
+  const exportSummary=await page.evaluate(()=>{
+    let book; XLSX.writeFile=wb=>{book=wb;}; exportReportExcel();
+    return XLSX.utils.sheet_to_json(book.Sheets['الملخص'],{header:1});
+  });
+  assert.equal(exportSummary.find(row=>row[0]==='الخصومات والتخفيضات المسجّلة')[1],4600);
+  await page.locator('[data-report-tab="print"]').click();
+  assert.match(await page.locator('#reportTabContent').textContent(),/الخصومات والتخفيضات المسجّلة/);
+
+  await nav(page,'visits');
+  await page.evaluate(()=>{window.showSaveFilePicker=undefined;});
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('[data-action="export-visits"]').click();
+  const bytes=await fs.readFile(await (await downloadPromise).path());
+  const exportRows=await page.evaluate(bytes=>{
+    const book=XLSX.read(Uint8Array.from(bytes),{type:'array'});
+    return {visits:XLSX.utils.sheet_to_json(book.Sheets['الزيارات'],{header:1}),summary:XLSX.utils.sheet_to_json(book.Sheets['الملخص'],{header:1})};
+  },[...bytes]);
+  const header=exportRows.visits[0], actual=exportRows.visits.find(row=>row[header.indexOf('حالة الزيارة')]==='مكتملة');
+  assert.equal(actual[header.indexOf('إجمالي التخفيض المسجّل (ج.س)')],4600);
+  assert.equal(actual[header.indexOf('الإجمالي بعد الخصم (ج.س)')],23400);
+  assert.equal(exportRows.summary.find(row=>row[0]==='التخفيضات المسجّلة (ج.س)')[1],4600);
+
+  await page.locator(`#visitsTable [data-action="edit-visit"][data-id="${visit.id}"]`).click();
+  assert.equal(await page.locator('#vDiscountType').inputValue(),'percent');
+  assert.equal(await page.locator('#vTotalDiscount').inputValue(),'4600');
+  await page.locator('#vPaid').fill('6000');
+  await page.locator('#vForm button[type="submit"]').click();
+  await page.waitForFunction(([k,id])=>JSON.parse(localStorage.getItem(k)||'[]').find(v=>v.id===id)?.paid===6000,[VISITS,visit.id]);
+  visit=(await data(page,VISITS)).find(v=>v.id===visit.id);
+  assert.equal(visit.due,17400); assert.equal(visit.discountAmount,2600);
+  assert.equal(await page.evaluate(id=>visitTotalDiscount(visits.find(v=>v.id===id)),visit.id),4600);
+});
+
+test('visit discounts reject invalid values and allow a zero-balance 100 percent discount', async t => {
+  const context=await createContext(t);
+  const page=await open(context); await login(page); await createPatient(page,'Validation Patient','912');
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  await page.locator('#vDiscountValue').fill('10001');
+  assert.equal(await page.locator('#vDiscountValue').evaluate(el=>el.checkValidity()),false);
+  await page.locator('#vForm button[type="submit"]').click();
+  assert.equal((await data(page,VISITS)).length,0);
+  await page.locator('#vDiscountType').selectOption('percent');
+  await page.locator('#vDiscountValue').fill('101');
+  assert.equal(await page.locator('#vDiscountValue').evaluate(el=>el.checkValidity()),false);
+  await page.locator('#vDiscountValue').fill('100');
+  await page.locator('#vPaid').fill('1');
+  assert.equal(await page.locator('#vPaid').evaluate(el=>el.checkValidity()),false);
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'0');
+  await page.locator('#vPaid').fill('0');
+  await page.locator('#vForm button[type="submit"]').click(); await waitCount(page,VISITS,1);
+  const visit=(await data(page,VISITS))[0];
+  assert.deepEqual([visit.discountAmount,visit.cost,visit.paid,visit.due],[10000,0,0,0]);
+});
+
+test('legacy visits do not acquire invented discounts after catalogue prices change', async t => {
+  const context=await createContext(t);
+  const page=await open(context);
+  await page.evaluate(({pkey,vkey})=>{
+    localStorage.setItem(pkey,JSON.stringify([{id:'legacy-p',file:'913',fullName:'Legacy patient',phone:'0912345678'}]));
+    localStorage.setItem(vkey,JSON.stringify([{id:'legacy-v',patientId:'legacy-p',date:todayString(),status:'مكتملة',cost:6000,paid:0,due:6000,items:[{procedure:'فحص وتشخيص',cost:6000}]}]));
+  },{pkey:PATIENTS,vkey:VISITS});
+  await page.reload(); await login(page);
+  assert.equal(await page.evaluate(()=>visitTotalDiscount(visits[0])),0);
+  await nav(page,'visits');
+  await page.locator('#visitsTable [data-action="edit-visit"]').click();
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'6000');
+  assert.equal(await page.locator('#vTotalDiscount').inputValue(),'0');
+  await page.locator('#vForm button[type="submit"]').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]')[0]?.items?.[0]?.catalogPrice===6000,VISITS);
+  assert.equal(await page.evaluate(()=>visitTotalDiscount(visits[0])),0);
+});
+
+test('unsaved bulk prices are not silently discarded when navigating or changing theme', async t => {
+  const context=await createContext(t);
+  const page=await open(context); await login(page); await nav(page,'settings');
+  await page.locator('#usdExchangeRate').fill('2000');
+  await page.locator('.proc-usd-input').first().fill('11');
+  let warning='';
+  page.once('dialog',async d=>{warning=d.message();await d.dismiss();});
+  await nav(page,'patients');
+  assert.match(warning,/تغييرات أسعار غير محفوظة/);
+  assert.equal(await page.locator('#pricingForm').isVisible(),true);
+  assert.equal(await page.locator('.proc-usd-input').first().inputValue(),'11');
+  page.once('dialog',d=>d.accept());
+  await nav(page,'patients');
+  assert.equal(await page.locator('#table').isVisible(),true);
+  assert.equal(await page.evaluate(k=>localStorage.getItem(k),PRICING),null);
+});
+
+test('fractional visit amounts are rounded consistently across payments, balances and service reports', async t => {
+  const context=await createContext(t);
+  const page=await open(context); await login(page); await createPatient(page,'Fraction Patient','914');
+  await page.locator('#table [data-action="new-visit-for"]').click();
+  await page.locator('#procedureList .proc-cost').first().fill('10.005');
+  await page.locator('#vDiscountValue').fill('0.004');
+  await page.locator('#vPaid').fill('5.005');
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'10.01');
+  assert.equal(await page.locator('#vDue').inputValue(),'5');
+  await page.locator('#vForm button[type="submit"]').click(); await waitCount(page,VISITS,1);
+  const saved=(await data(page,VISITS))[0];
+  assert.deepEqual([saved.cost,saved.paid,saved.due],[10.01,5.01,5]);
+  const computed=await page.evaluate(()=>{const c=computeRange(...reportRange()); return {rev:c.rev,services:Object.values(c.svc).map(x=>x.total)};});
+  assert.equal(computed.rev,10.01);
+  assert.equal(computed.services[0],10.01);
+  const rounding=await page.evaluate(()=>[roundMoney(1.005),roundMoney(10.075),roundMoney(0.004),roundMoney(-1.005)]);
+  assert.deepEqual(rounding,[1.01,10.08,0,-1.01]);
+  const exports=await page.evaluate(async()=>{
+    let reportBook,visitsBook;
+    XLSX.writeFile=book=>{reportBook=book;}; exportReportExcel();
+    saveWorkbook=async book=>{visitsBook=book;return true;}; await exportVisitsExcel();
+    return {report:XLSX.utils.sheet_to_json(reportBook.Sheets['الملخص'],{header:1}),visits:XLSX.utils.sheet_to_json(visitsBook.Sheets['الملخص'],{header:1})};
+  });
+  assert.equal(exports.report.find(row=>row[0]==='إجمالي الإيراد بعد الخصومات')[1],10.01);
+  assert.equal(exports.report.find(row=>row[0]==='المحصّل فعلياً')[1],5.01);
+  assert.equal(exports.visits.find(row=>row[0]==='إجمالي قيمة العلاج بعد الخصم (ج.س)')[1],10.01);
+  assert.equal(exports.visits.find(row=>row[0]==='إجمالي المدفوع (ج.س)')[1],5.01);
+  const fallback=await page.evaluate(()=>visitNetItems({procedure:'Old',cost:70,discountAmount:30})[0].cost);
+  assert.equal(fallback,70,'legacy-style imported visits should not have the discount applied twice');
+  await page.evaluate(async()=>{
+    visits.push({id:'imported-discount',patientId:patients[0].id,date:todayString(),status:'مكتملة',procedure:'فحص وتشخيص',grossCost:100,cost:70,discountType:'percent',discountAmount:30,paid:0,due:70});
+    await save();
+  });
+  await nav(page,'visits');
+  await page.locator('#visitsTable [data-action="edit-visit"][data-id="imported-discount"]').click();
+  assert.equal(await page.locator('#vGrossCost').inputValue(),'100');
+  assert.equal(await page.locator('#vDiscountType').inputValue(),'amount');
+  assert.equal(await page.locator('#vDiscountValue').inputValue(),'30');
+  assert.equal(await page.locator('#vTotalCost').inputValue(),'70');
+  await page.locator('#vForm button[type="submit"]').click();
+  await page.waitForFunction(k=>JSON.parse(localStorage.getItem(k)||'[]').find(v=>v.id==='imported-discount')?.items?.length===1,VISITS);
+  assert.equal((await data(page,VISITS)).find(v=>v.id==='imported-discount').cost,70);
+});
+
+test('an incomplete dollar pricing configuration warns and uses the last saved Sudanese price', async t => {
+  const context=await createContext(t);
+  const page=await open(context);
+  await page.evaluate(k=>localStorage.setItem(k,JSON.stringify([{id:'linked',name:'Stored procedure',cost:17000,usdPrice:10}])),PROCEDURES);
+  await page.reload();
+  assert.match(await page.locator('#storageWarning').textContent(),/لا تملك سعر صرف صالحاً/);
+  await login(page); await nav(page,'settings');
+  assert.equal(await page.locator('.proc-cost-input').first().inputValue(),'17000');
+  await page.locator('#usdExchangeRate').fill('1000');
+  assert.equal(await page.locator('.proc-cost-input').first().inputValue(),'10000');
+  await page.locator('#savePricingBtn').click();
+  await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('تم حفظ سعر الصرف'));
+  assert.equal(await page.locator('#storageWarning').isHidden(),true);
+});

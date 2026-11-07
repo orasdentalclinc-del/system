@@ -201,3 +201,12 @@ test('Electron Packager filter keeps the native database dependency and offline 
     assert.equal(await filter(path.join(root,file)), false, `Expected ${file} to be excluded`);
   }
 });
+
+test('a saved exchange rate prevents importing legacy data over an existing clinic configuration', t => {
+  const dir=temporary(t), db=new EncryptedStore(path.join(dir,'db.sqlite3'));
+  db.open(PASS); t.after(()=>db.close());
+  db.setItem('oras-dental-pricing-v1',JSON.stringify([{id:'usd-sdg',rate:2000}]));
+  assert.throws(()=>db.importLegacy([{key:PATIENTS,value:'[{"id":"old"}]'}]),{code:'DATABASE_NOT_EMPTY'});
+  assert.equal(db.getItem(PATIENTS),null);
+  assert.equal(db.getItem(MIGRATION_KEY),null);
+});
