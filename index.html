@@ -95,6 +95,7 @@ break;case"<bookViews":;case"<bookViews>":;case"</bookViews>":break;case"<workbo
     else if(typeof module!=='undefined' && module.exports && module.exports.utils) window.XLSX = module.exports;
   }
 </script>
+  <link rel="stylesheet" href="finance-print.css">
   <style>
     :root{--ink:#1d1d1b;--muted:#766f65;--line:#e7dfd2;--paper:#faf8f3;--card:#fff;--gold:#c39a3d;--gold-dark:#7f5d1a;--soft:#f6eed9;--dark:#1b1b1a;--green:#2d7658;--red:#ae4740;--blue:#396c91;--shadow:0 12px 32px #2b1d090d}
     *{box-sizing:border-box}html{min-width:320px;scroll-behavior:smooth}body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);font-family:Tahoma,"Segoe UI",Arial,sans-serif;transition:background 0.3s ease}
@@ -834,6 +835,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
         [LISTS_KEY,customLists],[EXPENSES_KEY,expenses],[INVENTORY_KEY,inventory],
         [LABS_KEY,labs],[PLANS_KEY,treatmentPlans],[MONTHLY_KEY,monthlyReports]
       ];
+      if(window.OrasFinanceBridge&&OrasFinanceBridge.ready) jobs.push([OrasFinanceBridge.KEY,OrasFinanceBridge.snapshot()]);
       const failed=[];
       jobs.forEach(([k,v])=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ failed.push(k); } });
       if(!failed.length){ snapshotCurrentData("auto"); }
@@ -870,7 +872,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     function snapshotCurrentData(reason){
       try{
         localStorage.setItem(BACKUP_KEY, JSON.stringify({t:Date.now(), reason:reason||"auto",
-          data:{patients,visits,procedures,customLists,expenses,inventory,labs,treatmentPlans,monthlyReports}}));
+          data:{patients,visits,procedures,customLists,expenses,inventory,labs,treatmentPlans,monthlyReports,finance:(window.OrasFinanceBridge&&OrasFinanceBridge.ready)?OrasFinanceBridge.snapshot():null}}));
       }catch(e){/* النسخة التلقائية اختيارية — تجاهل فشلها بصمت */}
     }
     function sanitizeImported(arr, tag){
@@ -1528,7 +1530,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             inventory,
             labs,
             treatmentPlans,
-            monthlyReports
+            monthlyReports,
+            finance: (window.OrasFinanceBridge&&OrasFinanceBridge.ready)?OrasFinanceBridge.snapshot():null
           },
           settings: {
             theme: theme || "default"
@@ -4473,6 +4476,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
           if(Array.isArray(d.labs)) labs=sanitizeImported(d.labs,'l');
           if(Array.isArray(d.treatmentPlans)) treatmentPlans=sanitizeImported(d.treatmentPlans,'pl');
           if(Array.isArray(d.monthlyReports)) monthlyReports=sanitizeImported(d.monthlyReports,'mr');
+          if(d.finance&&window.OrasFinanceBridge) OrasFinanceBridge.restoreState(d.finance);
           save();
           render();
           message("تم استرجاع النسخة التلقائية بنجاح.");
@@ -4737,6 +4741,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
             if(Array.isArray(source.labs)) labs = sanitizeImported(source.labs,'l');
             if(Array.isArray(source.treatmentPlans)) treatmentPlans = sanitizeImported(source.treatmentPlans,'pl');
             if(Array.isArray(source.monthlyReports)) monthlyReports = sanitizeImported(source.monthlyReports,'mr');
+            if(source.finance&&window.OrasFinanceBridge) OrasFinanceBridge.restoreState(source.finance);
 
             if(parsed.settings && parsed.settings.theme){
               setTheme(parsed.settings.theme);
@@ -4802,6 +4807,7 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
       labs=load(LABS_KEY,labs);
       treatmentPlans=load(PLANS_KEY,treatmentPlans);
       monthlyReports=load(MONTHLY_KEY,monthlyReports);
+      if(window.OrasFinanceBridge&&OrasFinanceBridge.ready) OrasFinanceBridge.reload();
     }
     window.addEventListener("storage",(e)=>{
       if(e.key && !String(e.key).startsWith("oras-dental-")) return;
@@ -4826,5 +4832,8 @@ body.theme-dark .inline-input{background:#242421;color:#f1f1ef;border-color:#444
     });
   
   </script>
+  <script src="finance-core.js"></script>
+  <script src="finance-bridge.js"></script>
+  <script src="finance-ui.js"></script>
 <script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a34a9746891aed44',t:'MTc4ODMzMTkzNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a353e52b089dedb3',t:'MTc4ODQyOTQ5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

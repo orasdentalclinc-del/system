@@ -1,0 +1,4 @@
+node_modules/
+.coverage/
+*.pdf
+!docs/reception-daily-guide.pdf

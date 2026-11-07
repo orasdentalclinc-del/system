@@ -1,0 +1,20 @@
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
+import {execFileSync} from 'node:child_process';
+if(!fs.existsSync('/tmp/al2023/lib/libnss3.so')){fs.mkdirSync('/tmp/al2023',{recursive:true});fs.writeFileSync('/tmp/al2023.tar',zlib.brotliDecompressSync(fs.readFileSync('node_modules/@sparticuz/chromium/bin/al2023.tar.br')));execFileSync('tar',['-xf','/tmp/al2023.tar','-C','/tmp/al2023']);}
+process.env.LD_LIBRARY_PATH='/tmp/al2023/lib:/tmp'+(process.env.LD_LIBRARY_PATH?':'+process.env.LD_LIBRARY_PATH:'');
+const browser=await puppeteer.launch({args:chromium.args,executablePath:await chromium.executablePath(),headless:true});
+const page=await browser.newPage();
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:3000',{waitUntil:'networkidle2',timeout:60000});
+await page.evaluate(()=>{setCurrentRole('manager');closeRoleGate();view='reports';render();});
+await new Promise(r=>setTimeout(r,300));
+console.log('title',await page.title());
+console.log('bridge',await page.evaluate(()=>!!window.OrasFinanceBridge));
+console.log('reports heading',await page.evaluate(()=>document.querySelector('#content h1')?.textContent));
+console.log('fin tabs',await page.evaluate(()=>[...document.querySelectorAll('[data-fin-tab]')].map(x=>x.textContent)));
+console.log('pageerrors',errors);
+await browser.close();
+if(errors.length)process.exit(1);
